@@ -21,7 +21,7 @@ bigcommerceRouter.get('/admin', (_req, res) => {
 const adminDist = path.resolve('dist/admin');
 bigcommerceRouter.use('/admin', express.static(adminDist));
 
-// SPA fallback — any /admin/* path that doesn't match a file serves index.html
-bigcommerceRouter.get('/admin/*', (_req, res) => {
+// SPA fallback — /admin/ root and any /admin/* path that doesn't match a static file
+bigcommerceRouter.get(['/admin/', '/admin/*'], (_req, res) => {
   res.sendFile(path.join(adminDist, 'index.html'));
 });
