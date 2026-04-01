@@ -11,7 +11,11 @@
     "postbuild:server": "node -e \"require('fs').writeFileSync('dist/server/package.json', JSON.stringify({type:'commonjs'}))\"",
     "dev:admin": "vite --config vite.admin.config.ts",
     "dev:server": "tsx watch server/index.ts",
-    "start": "node dist/server/index.js"
+    "start": "pm2 start dist/server/index.js --name verify-integrations",
+    "stop": "pm2 stop verify-integrations",
+    "restart": "pm2 restart verify-integrations",
+    "rebuild": "npm run build:storefront && npm run build:admin && npm run build:server && pm2 reload verify-integrations",
+    "logs": "pm2 logs verify-integrations"
   },
   "dependencies": {
     "react": "^18",

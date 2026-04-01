@@ -100,7 +100,7 @@ npm run build:admin
 
 # Start the server with hot reload
 npm run dev:server
-# → http://localhost:3000
+# → http://localhost:3033
 
 # In a separate terminal, rebuild the admin SPA if you change frontend code
 npm run dev:admin   # standalone Vite dev server for admin (no OAuth, no config injection)
@@ -111,7 +111,108 @@ npm run dev:admin   # standalone Vite dev server for admin (no OAuth, no config 
 ```bash
 npm run build          # storefront + admin
 npm run build:server   # TypeScript → dist/server/
-npm start              # node dist/server/index.js
+npm start              # register & start with pm2 (first-time only — see below)
+```
+
+---
+
+## Production Deployment
+
+The server runs on Node.js managed by **pm2**, behind **Apache** as an HTTPS reverse proxy.
+
+**Production URL:** `https://verify-integrations.ad-hoc.app` (port 3033 internally)
+
+### Prerequisites
+
+```bash
+# Apache modules
+sudo a2enmod proxy proxy_http rewrite headers ssl
+
+# pm2 globally
+npm install -g pm2
+```
+
+### First-Time Setup
+
+```bash
+# 1. Clone, install, and configure
+cd /var/www/verify-integrations.ad-hoc.app
+git clone <repo-url> .
+npm install
+cp .env.example .env && nano .env   # fill in all required values, PORT=3033
+
+# 2. Build everything
+npm run build:storefront
+npm run build:admin
+npm run build:server
+
+# 3. Start with pm2 and persist the process list
+npm start          # registers as "verify-integrations" and starts
+pm2 save           # persist so the process survives reboots
+pm2 startup        # follow the printed command to enable pm2 on system boot
+```
+
+### Apache Virtual Host
+
+Create `/etc/apache2/sites-available/verify-integrations.ad-hoc.app.conf`:
+
+```apache
+<VirtualHost *:80>
+    ServerName verify-integrations.ad-hoc.app
+    RewriteEngine on
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</VirtualHost>
+
+<VirtualHost *:443>
+    ServerName verify-integrations.ad-hoc.app
+
+    SSLCertificateFile /etc/letsencrypt/live/verify-integrations.ad-hoc.app/fullchain.pem
+    SSLCertificateKeyFile /etc/letsencrypt/live/verify-integrations.ad-hoc.app/privkey.pem
+    Include /etc/letsencrypt/options-ssl-apache.conf
+
+    ProxyPreserveHost On
+    ProxyPass / http://127.0.0.1:3033/
+    ProxyPassReverse / http://127.0.0.1:3033/
+
+    Header always set X-Frame-Options SAMEORIGIN
+    Header always set X-Content-Type-Options nosniff
+</VirtualHost>
+```
+
+> **No DocumentRoot.** All requests — including the admin SPA — must route through Node. Serving `dist/admin/index.html` directly from Apache would bypass the `/bigcommerce/load` handler that injects `window.AdHocAdminConfig` at request time, breaking the admin dashboard.
+
+Enable and reload:
+
+```bash
+sudo a2ensite verify-integrations.ad-hoc.app.conf
+sudo systemctl reload apache2
+```
+
+### SSL Certificate (Let's Encrypt)
+
+```bash
+sudo apt install certbot python3-certbot-apache
+sudo certbot --apache -d verify-integrations.ad-hoc.app
+```
+
+### Deploying Changes
+
+After pulling updated source to the server:
+
+```bash
+npm run rebuild
+# Runs: build:storefront + build:admin + build:server, then pm2 reload (zero-downtime)
+```
+
+### pm2 Reference
+
+```bash
+pm2 list                          # show all processes and status
+npm run logs                      # tail logs for this app
+pm2 monit                         # live CPU/memory dashboard
+npm run restart                   # hard restart
+npm run stop                      # stop without removing from pm2
+pm2 delete verify-integrations    # remove from pm2 process list entirely
 ```
 
 ---
