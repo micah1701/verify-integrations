@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Runtime database
+data/*.db
+data/*.db-shm
+data/*.db-wal
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Vite cache
+.vite/
+
+# TypeScript
+*.tsbuildinfo
+
+# OS
+.DS_Store
+Thumbs.db
+.claude
+
+# Editor
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
