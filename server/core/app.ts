@@ -7,6 +7,12 @@ export const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// Default: deny framing from other origins. load.ts overrides this for BigCommerce.
+app.use((_req, res, next) => {
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  next();
+});
+
 // Health check — no auth, no integration context
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', ts: Date.now() });

@@ -174,7 +174,6 @@ Create `/etc/apache2/sites-available/verify-integrations.ad-hoc.app.conf`:
     ProxyPass / http://127.0.0.1:3033/
     ProxyPassReverse / http://127.0.0.1:3033/
 
-    Header always set X-Frame-Options SAMEORIGIN
     Header always set X-Content-Type-Options nosniff
 </VirtualHost>
 ```

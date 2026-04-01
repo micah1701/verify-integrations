@@ -78,5 +78,9 @@ export const handleLoad: RequestHandler = (req, res) => {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   // Prevent proxies/browsers from caching the page — it contains a live access token
   res.setHeader('Cache-Control', 'no-store');
+  // This page is loaded inside an iframe in the BigCommerce control panel.
+  // Remove the default SAMEORIGIN restriction and allow only BC domains.
+  res.removeHeader('X-Frame-Options');
+  res.setHeader('Content-Security-Policy', "frame-ancestors 'self' https://*.bigcommerce.com https://*.mybigcommerce.com");
   res.send(injectedHtml);
 };
