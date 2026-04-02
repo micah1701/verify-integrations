@@ -9,6 +9,7 @@
 
   const dispatch = createEventDispatcher<{
     complete: { verificationId: string; result: VerificationOutcome | null };
+    manual_review: { verificationId: string };
     close: void;
   }>();
 
@@ -31,12 +32,21 @@
     dispatch('complete', { verificationId: id, result });
   }
 
+  function handleManualReview(id: string) {
+    if (completed) return;
+    completed = true;
+    stopPolling();
+    dispatch('manual_review', { verificationId: id });
+  }
+
   async function pollOnce() {
     if (completed) return;
     const data = await getVerificationResult(apiBase, verificationId);
     if (!data || completed) return;
     if (data.status === 'completed') {
       handleCompletion(verificationId, data.result ?? null);
+    } else if (data.status === 'manual_review') {
+      handleManualReview(verificationId);
     } else if (data.status === 'expired') {
       stopPolling();
     }
@@ -49,7 +59,11 @@
       const msgId: string = event.data.verificationId ?? verificationId;
       // Fetch result then fire completion (mirrors original.js fetchResultAndComplete)
       getVerificationResult(apiBase, msgId).then((data) => {
-        handleCompletion(msgId, data?.result ?? null);
+        if (data?.status === 'manual_review') {
+          handleManualReview(msgId);
+        } else {
+          handleCompletion(msgId, data?.result ?? null);
+        }
       });
     }
   }

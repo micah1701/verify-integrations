@@ -1,7 +1,6 @@
 import { dbGet, dbSet } from '../../core/cache.js';
 import { bcMetafieldsProxy, buildMetafieldPayload } from '../../core/verify-api.js';
-import type { BCRawMetafield, ResolvedMetafield } from '../../core/types.js';
-import type { VerificationOutcome } from '../../core/types.js';
+import type { BCRawMetafield, ResolvedMetafield, VerificationOutcome, VerificationStatus } from '../../core/types.js';
 
 const TTL_CART = 5 * 60 * 1000;   // 5 min
 const TTL_JWT  = 30 * 60 * 1000;  // 30 min
@@ -134,8 +133,9 @@ export async function saveCartMetafield(
   verificationId: string,
   result: VerificationOutcome | null,
   existingId?: number,
+  status: VerificationStatus = 'completed',
 ): Promise<boolean> {
-  const payload = buildMetafieldPayload(verificationId, result);
+  const payload = buildMetafieldPayload(verificationId, result, status);
   const data = await bcMetafieldsProxy(apiBase, {
     action: 'write',
     storeHash,
@@ -156,9 +156,10 @@ export async function saveCustomerMetafield(
   verificationId: string,
   result: VerificationOutcome | null,
   existingId?: number,
+  status: VerificationStatus = 'completed',
 ): Promise<boolean> {
   if (!customerId || customerId === 0) return false;
-  const payload = buildMetafieldPayload(verificationId, result);
+  const payload = buildMetafieldPayload(verificationId, result, status);
   const data = await bcMetafieldsProxy(apiBase, {
     action: 'write',
     storeHash,

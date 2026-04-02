@@ -13,7 +13,7 @@ export type VerificationStatus =
   | 'manual_review'
   | 'expired';
 
-export type VerificationState = 'verified' | 'invalid' | 'incomplete' | 'unverified';
+export type VerificationState = 'verified' | 'invalid' | 'incomplete' | 'unverified' | 'pending_review';
 
 // ─── Ruleset ──────────────────────────────────────────────────────────────────
 
@@ -59,6 +59,18 @@ export interface ResolvedState {
 
 // ─── Plugin Config (window.AdHocVerifyConfig) ─────────────────────────────────
 
+export interface ManualReviewConfig {
+  /** Block checkout while verification is pending review. Default: false (allow checkout). */
+  blockCheckout: boolean;
+  /**
+   * Message shown to the customer when their verification is pending manual review.
+   * Set to null, false, or '' to suppress the message entirely.
+   * Default: "Your verification is pending a manual review. You may continue to place your
+   * order, but there may be a delay in processing while we confirm your verification."
+   */
+  message: string | null | false;
+}
+
 export interface AdHocVerifyConfig {
   integrationKey: string;
   apiBase: string;
@@ -70,6 +82,7 @@ export interface AdHocVerifyConfig {
   selector: string;
   pages: string[];
   ruleset: Ruleset;
+  manualReview?: Partial<ManualReviewConfig>;
   onComplete?: (id: string) => void;
   onResult?: (result: VerificationResultCallback) => void;
 }

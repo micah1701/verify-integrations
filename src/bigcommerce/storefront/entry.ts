@@ -54,6 +54,11 @@ const defaults: Omit<AdHocVerifyConfig, 'integrationKey'> = {
     requireOver18: false,
     requireOver21: false,
   },
+  manualReview: {
+    blockCheckout: false,
+    message:
+      'Your verification is pending a manual review. You may continue to place your order, but there may be a delay in processing while we confirm your verification.',
+  },
 };
 
 const userConfig = (window as Window & { AdHocVerifyConfig?: Partial<AdHocVerifyConfig> })
@@ -69,6 +74,8 @@ const config: AdHocVerifyConfig = {
   ...userConfig,
   // Deep-merge ruleset so partial overrides still pick up defaults
   ruleset: { ...defaults.ruleset, ...(userConfig.ruleset ?? {}) },
+  // Deep-merge manualReview so partial overrides still pick up defaults
+  manualReview: { ...defaults.manualReview, ...(userConfig.manualReview ?? {}) },
 } as AdHocVerifyConfig;
 
 // ─── 2. Page Guard ───────────────────────────────────────────────────────────
@@ -173,6 +180,53 @@ async function saveVerificationAndRefreshUI(
   }
 }
 
+// ─── 5b. Manual Review Handler ───────────────────────────────────────────────
+
+async function handleManualReviewResult(id: string): Promise<void> {
+  const saves: Promise<boolean>[] = [
+    saveCartMetafield(
+      config.apiBase,
+      config.storeHash!,
+      config.storeAccessToken!,
+      _cartId,
+      id,
+      null,
+      _cartMfId,
+      'manual_review',
+    ),
+  ];
+  if (_customerId !== 0) {
+    saves.push(
+      saveCustomerMetafield(
+        config.apiBase,
+        config.storeHash!,
+        config.storeAccessToken!,
+        _customerId,
+        id,
+        null,
+        _customerMfId,
+        'manual_review',
+      ),
+    );
+  }
+  await Promise.all(saves);
+  await invalidateMetafieldCache(_cartId, _customerId);
+
+  const reviewCfg = config.manualReview!;
+  const msg = reviewCfg.message !== undefined ? reviewCfg.message : defaults.manualReview!.message;
+
+  statusCardInstance?.$set({
+    state: 'pending_review' as VerificationState,
+    pendingReviewMessage: msg || null,
+  });
+
+  if (reviewCfg.blockCheckout) {
+    renderCheckoutBlock();
+  } else {
+    removeCheckoutBlock();
+  }
+}
+
 // ─── 6. Init ─────────────────────────────────────────────────────────────────
 
 async function init(): Promise<void> {
@@ -214,7 +268,11 @@ async function init(): Promise<void> {
 
   mountStatusCard(container, resolved.state);
 
-  if (resolved.state !== 'verified' && isCheckout && config.ruleset.requireVerification) {
+  if (resolved.state === 'pending_review') {
+    if (isCheckout && config.manualReview?.blockCheckout) {
+      renderCheckoutBlock();
+    }
+  } else if (resolved.state !== 'verified' && isCheckout && config.ruleset.requireVerification) {
     renderCheckoutBlock();
   }
 }
@@ -225,9 +283,14 @@ function mountStatusCard(container: HTMLElement, initialState: VerificationState
   container.innerHTML = '';
   statusCardInstance?.$destroy();
 
+  const reviewMsg = config.manualReview?.message ?? defaults.manualReview!.message;
   statusCardInstance = new StatusCard({
     target: container,
-    props: { state: initialState, buttonText: config.buttonText },
+    props: {
+      state: initialState,
+      buttonText: config.buttonText,
+      pendingReviewMessage: reviewMsg || null,
+    },
   });
 
   statusCardInstance.$on('verify', () => void handleVerifyClick());
@@ -262,6 +325,12 @@ async function handleVerifyClick(): Promise<void> {
       sessionStorage.removeItem(SESSION_KEY);
       destroyModal(modal);
       void saveVerificationAndRefreshUI(e.detail.verificationId, e.detail.result);
+    });
+
+    modal.$on('manual_review', (e: CustomEvent<{ verificationId: string }>) => {
+      sessionStorage.removeItem(SESSION_KEY);
+      destroyModal(modal);
+      void handleManualReviewResult(e.detail.verificationId);
     });
 
     modal.$on('close', () => destroyModal(modal));

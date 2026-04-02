@@ -1,4 +1,4 @@
-import type { MetafieldValue, VerificationOutcome } from './types.js';
+import type { MetafieldValue, VerificationOutcome, VerificationStatus } from './types.js';
 
 // ─── Generic fetch helper ─────────────────────────────────────────────────────
 
@@ -93,10 +93,11 @@ export async function bcMetafieldsProxy<T>(
 export function buildMetafieldPayload(
   verificationId: string,
   result: VerificationOutcome | null,
+  status: VerificationStatus = 'completed',
 ): object {
   const value: MetafieldValue = {
     verificationId,
-    status: 'completed',
+    status,
     completedAt: new Date().toISOString(),
     verification: {
       success: result?.success ?? null,

@@ -4,20 +4,27 @@
 
   export let state: VerificationState;
   export let buttonText: string = 'Verify ID';
+  export let pendingReviewMessage: string | null | false = 'Verification pending review';
 
   const dispatch = createEventDispatcher<{ verify: void }>();
 
-  const messages: Record<Exclude<VerificationState, 'verified'>, string> = {
+  const messages: Record<'unverified' | 'incomplete' | 'invalid', string> = {
     unverified: 'Please verify your identity before checkout.',
     incomplete: 'Your previous verification is incomplete. Please try again.',
     invalid: 'Your previous verification did not meet the requirements. Please verify again.',
   };
+
+  $: actionMessage = (messages as Record<string, string>)[state] ?? messages.unverified;
 </script>
 
 {#if state === 'verified'}
   <p class="adhoc-verified">&#10003; Identity Verified</p>
+{:else if state === 'pending_review'}
+  {#if pendingReviewMessage}
+    <p class="adhoc-pending">{pendingReviewMessage}</p>
+  {/if}
 {:else}
-  <p class="adhoc-message">{messages[state] ?? messages.unverified}</p>
+  <p class="adhoc-message">{actionMessage}</p>
   <button class="adhoc-btn" on:click={() => dispatch('verify')}>
     {buttonText}
   </button>
@@ -34,6 +41,12 @@
   .adhoc-message {
     margin-bottom: 10px;
     font-size: 16px;
+  }
+
+  .adhoc-pending {
+    margin: 0;
+    font-size: 14px;
+    color: #856404;
   }
 
   .adhoc-btn {

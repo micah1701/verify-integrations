@@ -20,6 +20,7 @@ export function evaluateVerificationState(
   ruleset: Ruleset,
 ): VerificationState {
   if (!mfValue) return 'unverified';
+  if (mfValue.status === 'manual_review') return 'pending_review';
   if (mfValue.status !== 'completed') return 'incomplete';
 
   const v = mfValue.verification;
