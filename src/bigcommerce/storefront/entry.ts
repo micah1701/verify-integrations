@@ -240,14 +240,15 @@ async function handleVerifyClick(): Promise<void> {
     const body: Parameters<typeof createVerification>[2] = {};
     if (config.templateId) body.template_id = config.templateId;
 
-    const { id, url } = await createVerification(config.apiBase, config.integrationKey, body);
+    const { id } = await createVerification(config.apiBase, config.integrationKey, body);
+    const verificationUrl = `${config.verifyBase}/verify/${id}`;
 
     modalWrapperEl = document.createElement('div');
     document.body.appendChild(modalWrapperEl);
 
     const modal = new VerifyModal({
       target: modalWrapperEl,
-      props: { verificationUrl: url, verificationId: id, apiBase: config.apiBase },
+      props: { verificationUrl, verificationId: id, apiBase: config.apiBase },
     });
 
     modal.$on('complete', (e: CustomEvent<{ verificationId: string; result: VerificationOutcome | null }>) => {
