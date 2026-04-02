@@ -17,6 +17,9 @@ bigcommerceRouter.get('/admin', (_req, res) => {
   res.redirect(301, '/bigcommerce/admin/');
 });
 
+// Serve the storefront IIFE bundle (used during development; replace with CDN URL in production)
+bigcommerceRouter.use('/storefront', express.static(path.resolve('dist/storefront')));
+
 // Serve the built React SPA and its assets
 const adminDist = path.resolve('dist/admin');
 bigcommerceRouter.use('/admin', express.static(adminDist));
