@@ -233,14 +233,21 @@ function mountStatusCard(container: HTMLElement, initialState: VerificationState
   statusCardInstance.$on('verify', () => void handleVerifyClick());
 }
 
+const SESSION_KEY = `adhoc_verify_pending_${config.integrationKey}`;
+
 async function handleVerifyClick(): Promise<void> {
   if (modalWrapperEl) return; // Modal already open
 
   try {
-    const body: Parameters<typeof createVerification>[2] = {};
-    if (config.templateId) body.template_id = config.templateId;
+    let id = sessionStorage.getItem(SESSION_KEY);
 
-    const { id } = await createVerification(config.apiBase, config.integrationKey, body);
+    if (!id) {
+      const body: Parameters<typeof createVerification>[2] = {};
+      if (config.templateId) body.template_id = config.templateId;
+      ({ id } = await createVerification(config.apiBase, config.integrationKey, body));
+      sessionStorage.setItem(SESSION_KEY, id);
+    }
+
     const verificationUrl = `${config.verifyBase}/verify/${id}`;
 
     modalWrapperEl = document.createElement('div');
@@ -252,6 +259,7 @@ async function handleVerifyClick(): Promise<void> {
     });
 
     modal.$on('complete', (e: CustomEvent<{ verificationId: string; result: VerificationOutcome | null }>) => {
+      sessionStorage.removeItem(SESSION_KEY);
       destroyModal(modal);
       void saveVerificationAndRefreshUI(e.detail.verificationId, e.detail.result);
     });
