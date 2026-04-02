@@ -60,7 +60,7 @@ export interface ResolvedState {
 // ─── Plugin Config (window.AdHocVerifyConfig) ─────────────────────────────────
 
 export interface AdHocVerifyConfig {
-  apiKey: string;
+  integrationKey: string;
   apiBase: string;
   verifyBase: string;
   storeHash?: string;

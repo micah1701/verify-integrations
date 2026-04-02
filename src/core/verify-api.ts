@@ -30,12 +30,12 @@ export interface CreateVerificationResponse {
 
 export async function createVerification(
   apiBase: string,
-  apiKey: string,
+  integrationKey: string,
   body: CreateVerificationBody,
 ): Promise<CreateVerificationResponse> {
   const r = await fetch(`${apiBase}/create-verification`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
+    headers: { 'Content-Type': 'application/json', 'X-API-Key': integrationKey },
     body: JSON.stringify(body),
   });
   if (!r.ok) {

@@ -5,7 +5,7 @@
  *
  *   <script>
  *     window.AdHocVerifyConfig = {
- *       apiKey:           'ahv_pub_...',
+ *       integrationKey:   'ahv_pub_...',
  *       storeHash:        'abc123',
  *       storeAccessToken: 'TOKEN',
  *       pages:            ['cart', 'checkout'],
@@ -42,7 +42,7 @@ declare const __ADHOC_BC_CLIENT_ID__: string;
 
 // ─── 1. Defaults & Config ────────────────────────────────────────────────────
 
-const defaults: Omit<AdHocVerifyConfig, 'apiKey'> = {
+const defaults: Omit<AdHocVerifyConfig, 'integrationKey'> = {
   apiBase: 'https://verify-api.ad-hoc.app',
   verifyBase: 'https://verify.ad-hoc.app',
   buttonText: 'Verify ID',
@@ -59,8 +59,8 @@ const defaults: Omit<AdHocVerifyConfig, 'apiKey'> = {
 const userConfig = (window as Window & { AdHocVerifyConfig?: Partial<AdHocVerifyConfig> })
   .AdHocVerifyConfig ?? {};
 
-if (!userConfig.apiKey) {
-  console.error('[Ad-Hoc Verify] Missing apiKey in AdHocVerifyConfig');
+if (!userConfig.integrationKey) {
+  console.error('[Ad-Hoc Verify] Missing integrationKey in AdHocVerifyConfig');
   // Stop execution without throwing (IIFE — a throw here would surface as uncaught)
 } else {
 
@@ -240,7 +240,7 @@ async function handleVerifyClick(): Promise<void> {
     const body: Parameters<typeof createVerification>[2] = {};
     if (config.templateId) body.template_id = config.templateId;
 
-    const { id, url } = await createVerification(config.apiBase, config.apiKey, body);
+    const { id, url } = await createVerification(config.apiBase, config.integrationKey, body);
 
     modalWrapperEl = document.createElement('div');
     document.body.appendChild(modalWrapperEl);
@@ -277,4 +277,4 @@ if (document.readyState === 'loading') {
 }
 
 } // end page guard
-} // end apiKey guard
+} // end integrationKey guard
