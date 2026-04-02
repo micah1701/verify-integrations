@@ -97,12 +97,18 @@
 
   .adhoc-modal {
     width: 90%;
-    max-width: 600px;
+    max-width: 480px;
     height: 85%;
     background: #fff;
     position: relative;
     border-radius: 8px;
     overflow: hidden;
+  }
+
+  @media (min-width: 768px) {
+    .adhoc-modal {
+      max-width: 880px;
+    }
   }
 
   .adhoc-close {
