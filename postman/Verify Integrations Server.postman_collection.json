@@ -1,0 +1,144 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-0001-0001-0001-000000000001",
+    "name": "Verify Integrations Server",
+    "description": "Our Express server at verify-integrations.ad-hoc.app. Covers the health check and all BigCommerce app lifecycle endpoints (OAuth install, load, uninstall).\n\nSet `base_url` to `http://localhost:3000` for local dev.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://verify-integrations.ad-hoc.app",
+      "type": "string",
+      "description": "Switch to http://localhost:3000 for local dev"
+    },
+    {
+      "key": "signed_payload_jwt",
+      "value": "",
+      "type": "string",
+      "description": "HS256 JWT signed with BC_CLIENT_SECRET. BC sends this on load/uninstall. Generate one with the 'Generate Test JWT' request below or copy from a real BC callback."
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "GET /health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            },
+            "description": "Liveness check. Returns `{ status: 'ok', ts: <epoch> }`. No auth required."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": \"ok\",\n  \"ts\": 1743984000000\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "BigCommerce — OAuth Lifecycle",
+      "description": "These three endpoints are called by BigCommerce during app installation, app load (merchant opens the app in the control panel), and app uninstall.\n\n`/auth` receives a plain `code` query param. `/load` and `/uninstall` receive a `signed_payload_jwt` — an HS256 JWT signed with `BC_CLIENT_SECRET`.",
+      "item": [
+        {
+          "name": "GET /bigcommerce/auth  (OAuth install callback)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/bigcommerce/auth?code=REPLACE_WITH_BC_CODE&scope=store_v2_carts+store_v2_customers&context=stores/REPLACE_WITH_STORE_HASH",
+              "host": ["{{base_url}}"],
+              "path": ["bigcommerce", "auth"],
+              "query": [
+                {
+                  "key": "code",
+                  "value": "REPLACE_WITH_BC_CODE",
+                  "description": "One-time authorization code from BigCommerce. Only valid for a few minutes and only usable once — copy from the real BC redirect."
+                },
+                {
+                  "key": "scope",
+                  "value": "store_v2_carts store_v2_customers",
+                  "description": "URL-encoded scope string BigCommerce sends"
+                },
+                {
+                  "key": "context",
+                  "value": "stores/REPLACE_WITH_STORE_HASH",
+                  "description": "Format: 'stores/<storeHash>'"
+                }
+              ]
+            },
+            "description": "Triggered when a merchant installs the app from the BC Marketplace. BC redirects to this URL with a one-time `code`. The server exchanges it for an access token at `login.bigcommerce.com/oauth2/token`, stores the token in `data/tokens.json`, and redirects to `/bigcommerce/admin/`.\n\n**You can only test this with a real code from a real BC install flow** — codes expire quickly and are single-use. Use this request to replay a code you captured from server logs."
+          }
+        },
+        {
+          "name": "GET /bigcommerce/load  (load app in control panel)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/bigcommerce/load?signed_payload_jwt={{signed_payload_jwt}}",
+              "host": ["{{base_url}}"],
+              "path": ["bigcommerce", "load"],
+              "query": [
+                {
+                  "key": "signed_payload_jwt",
+                  "value": "{{signed_payload_jwt}}",
+                  "description": "HS256 JWT signed with BC_CLIENT_SECRET. Claims: { sub: 'stores/<hash>', iss: '<clientId>', iat, exp, user: { id, email } }"
+                }
+              ]
+            },
+            "description": "Called by BC every time the merchant opens the app in the control panel (inside an iframe). Verifies the JWT, looks up the stored access token, injects `window.AdHocAdminConfig` into `dist/admin/index.html`, and returns the SPA HTML.\n\nHeaders: `Cache-Control: no-store`, `Content-Security-Policy: frame-ancestors 'self' https://*.bigcommerce.com`.\n\nTo test locally: generate a JWT with `jsonwebtoken` (or jwt.io) using your `BC_CLIENT_SECRET` and the claims above. The store hash must already exist in `data/tokens.json` (i.e. the store must have completed auth first)."
+          }
+        },
+        {
+          "name": "GET /bigcommerce/uninstall",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/bigcommerce/uninstall?signed_payload_jwt={{signed_payload_jwt}}",
+              "host": ["{{base_url}}"],
+              "path": ["bigcommerce", "uninstall"],
+              "query": [
+                {
+                  "key": "signed_payload_jwt",
+                  "value": "{{signed_payload_jwt}}",
+                  "description": "HS256 JWT signed with BC_CLIENT_SECRET. Claims: { sub: 'stores/<hash>', iat, exp }"
+                }
+              ]
+            },
+            "description": "Called by BC when a merchant uninstalls the app. Verifies the JWT and deletes the token record from `data/tokens.json`. Must return 200 or BC retries.\n\nTo test locally: generate a JWT the same way as `/load` (sub + iat/exp only — no user claim needed)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "BigCommerce — Admin SPA",
+      "item": [
+        {
+          "name": "GET /bigcommerce/admin/  (static SPA)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/bigcommerce/admin/",
+              "host": ["{{base_url}}"],
+              "path": ["bigcommerce", "admin", ""]
+            },
+            "description": "Serves `dist/admin/index.html` statically. No JWT check here — auth happens at `/bigcommerce/load`. Useful to check the admin build is deployed correctly."
+          }
+        }
+      ]
+    }
+  ]
+}

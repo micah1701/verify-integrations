@@ -1,0 +1,492 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-0002-0002-0002-000000000002",
+    "name": "Ad-Hoc Verify API",
+    "description": "All upstream Ad-Hoc Verify API calls — both the REST API (Bearer token) and the Integration Key (client-side) surface. Also covers the BC Metafields Proxy and the BigCommerce Storefront API calls the plugin makes.\n\nRun **POST /api/auth** first; the test script auto-saves `bearer_token` to collection variables.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "api_base",
+      "value": "https://verify-api.ad-hoc.app",
+      "type": "string"
+    },
+    {
+      "key": "bearer_token",
+      "value": "",
+      "type": "string",
+      "description": "Auto-populated by the POST /api/auth test script"
+    },
+    {
+      "key": "integration_key",
+      "value": "ahv_pub_REPLACE_ME",
+      "type": "string",
+      "description": "Publishable integration key from Profile → Integration Key in the dashboard"
+    },
+    {
+      "key": "verification_id",
+      "value": "",
+      "type": "string",
+      "description": "UUID of a verification. Populated automatically by the create-verification test scripts."
+    },
+    {
+      "key": "store_hash",
+      "value": "REPLACE_WITH_STORE_HASH",
+      "type": "string",
+      "description": "BigCommerce store hash (the short alphanumeric ID in the store URL)"
+    },
+    {
+      "key": "store_access_token",
+      "value": "REPLACE_WITH_BC_ACCESS_TOKEN",
+      "type": "string",
+      "description": "BigCommerce store-level API access token (X-Auth-Token). Needs Carts + Customers read/write scopes."
+    },
+    {
+      "key": "cart_id",
+      "value": "",
+      "type": "string",
+      "description": "UUID of a BigCommerce cart. Copy from a live cart or the loadCart() response."
+    },
+    {
+      "key": "customer_id",
+      "value": "",
+      "type": "string",
+      "description": "BigCommerce customer ID (integer as string)"
+    },
+    {
+      "key": "bc_store_domain",
+      "value": "REPLACE_WITH_STORE.mybigcommerce.com",
+      "type": "string",
+      "description": "Your BC store domain. Used for the Storefront API requests which must be called from the store domain."
+    }
+  ],
+  "item": [
+    {
+      "name": "1 · REST API — Auth",
+      "description": "Email + password → Bearer token. Tokens expire in 1 hour. The test script below auto-saves the token to `{{bearer_token}}`.",
+      "item": [
+        {
+          "name": "POST /api/auth  →  get Bearer token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.access_token) {",
+                  "  pm.collectionVariables.set('bearer_token', json.access_token);",
+                  "  console.log('bearer_token saved');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"you@company.com\",\n  \"password\": \"your-password\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{api_base}}/api/auth",
+              "host": ["{{api_base}}"],
+              "path": ["api", "auth"]
+            },
+            "description": "Rate limited: 5 req/min per email. Returns `{ access_token, expires_in }`. The test script auto-saves the token to `{{bearer_token}}`."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"access_token\": \"eyJ...\",\n  \"expires_in\": 3600\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2 · REST API — Verifications",
+      "description": "Server-side verification management. Requires `Authorization: Bearer {{bearer_token}}`.",
+      "item": [
+        {
+          "name": "POST /api/verification  →  create",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.id) {",
+                  "  pm.collectionVariables.set('verification_id', json.id);",
+                  "  console.log('verification_id saved:', json.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{bearer_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"template_id\": null,\n  \"webhook_url\": \"https://example.com/webhook\",\n  \"webhook_headers\": {},\n  \"requested_fields\": [\"first_names\", \"last_name\", \"dob\"],\n  \"external_id\": \"order-9981\",\n  \"phone_verification\": false,\n  \"include_license_photo\": false\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{api_base}}/api/verification",
+              "host": ["{{api_base}}"],
+              "path": ["api", "verification"]
+            },
+            "description": "Creates a new verification. Returns `{ id, url, created_at }`. Send `url` to the end user — they open it on mobile to complete the flow.\n\nThe test script saves `id` to `{{verification_id}}`.\n\nRate limited: 100 req/hour."
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "body": "{\n  \"id\": \"f47ac10b-58cc-4372-a567-0e02b2c3d479\",\n  \"url\": \"https://verify.ad-hoc.app/verify/f47ac10b-58cc-4372-a567-0e02b2c3d479\",\n  \"created_at\": \"2026-03-31T12:00:00.000Z\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "GET /api/verification  →  status + full results",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{bearer_token}}" }
+            ],
+            "url": {
+              "raw": "{{api_base}}/api/verification?id={{verification_id}}",
+              "host": ["{{api_base}}"],
+              "path": ["api", "verification"],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "{{verification_id}}",
+                  "description": "UUID from create response"
+                }
+              ]
+            },
+            "description": "Returns full verification status + results including `license_data` PII. Status flow: `pending` → `started` → `completed` / `manual_review` / `expired`.\n\nRate limited: 300 req/hour."
+          },
+          "response": [
+            {
+              "name": "200 completed",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"id\": \"f47ac10b-...\",\n  \"status\": \"completed\",\n  \"created_at\": \"...\",\n  \"completed_at\": \"...\",\n  \"result\": {\n    \"license_appears_real\": true,\n    \"license_expired\": false,\n    \"webcam_appears_live\": true,\n    \"webcam_face_matches_license_photo\": true,\n    \"face_match_score\": \"definite_match\",\n    \"over_18\": true,\n    \"over_21\": true\n  },\n  \"license_data\": {\n    \"first_names\": \"JOHN\",\n    \"last_name\": \"DOE\",\n    \"dob\": \"1990-01-15\"\n  }\n}"
+            },
+            {
+              "name": "200 pending",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"id\": \"f47ac10b-...\",\n  \"status\": \"pending\",\n  \"created_at\": \"...\",\n  \"result\": null\n}"
+            }
+          ]
+        },
+        {
+          "name": "POST /retry-webhook",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{bearer_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"verification_id\": \"{{verification_id}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{api_base}}/retry-webhook",
+              "host": ["{{api_base}}"],
+              "path": ["retry-webhook"]
+            },
+            "description": "Manually retriggers the webhook delivery for a completed verification. Useful when your endpoint was down at completion time."
+          }
+        },
+        {
+          "name": "POST /purge-pii",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{bearer_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"verification_id\": \"{{verification_id}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{api_base}}/purge-pii",
+              "host": ["{{api_base}}"],
+              "path": ["purge-pii"]
+            },
+            "description": "Deletes stored PII and face images for a verification. Irreversible."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3 · Integration Key — Storefront API",
+      "description": "The client-side / storefront surface. Uses `X-API-Key: {{integration_key}}` instead of a Bearer token. This is what the BC storefront plugin (`bigcommerce.js`) calls directly from the browser.\n\nThe integration key is safe to expose in client-side JS but only works from allowlisted domains.",
+      "item": [
+        {
+          "name": "POST /create-verification  (integration key)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.id) {",
+                  "  pm.collectionVariables.set('verification_id', json.id);",
+                  "  console.log('verification_id saved:', json.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-API-Key", "value": "{{integration_key}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"template_id\": null\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{api_base}}/create-verification",
+              "host": ["{{api_base}}"],
+              "path": ["create-verification"]
+            },
+            "description": "Client-side equivalent of `POST /api/verification`. Called by `createVerification()` in `src/core/verify-api.ts`. Returns `{ id, url, created_at }`.\n\nNote: In production this is called from the BC store domain and must be on the integration key's allowlist. Postman requests will return 403 unless you add Postman's IP or use a wildcard domain in the allowlist.\n\nRate limited: 30 req/hour (default)."
+          }
+        },
+        {
+          "name": "GET /get-verification-result  (public poll)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{api_base}}/get-verification-result?id={{verification_id}}",
+              "host": ["{{api_base}}"],
+              "path": ["get-verification-result"],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "{{verification_id}}"
+                }
+              ]
+            },
+            "description": "Public endpoint — no auth required. Called by `getVerificationResult()` in `src/core/verify-api.ts` during the modal polling loop.\n\nReturns only safe public-facing outcome fields — no PII (`license_data` is excluded). For full results use `GET /api/verification` with a Bearer token.\n\nThe verification iframe also fires `postMessage({ type: 'adhoc-verify-complete', verificationId })` on completion — the storefront plugin listens for that to kick off polling."
+          },
+          "response": [
+            {
+              "name": "200 completed",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": \"completed\",\n  \"result\": {\n    \"success\": true,\n    \"over_18\": true,\n    \"over_21\": true,\n    \"face_match_score\": \"definite_match\"\n  },\n  \"completed_at\": \"2026-03-31T12:05:00.000Z\"\n}"
+            },
+            {
+              "name": "200 pending",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": \"pending\",\n  \"result\": null\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4 · BC Metafields Proxy",
+      "description": "The `POST /bc-metafields` endpoint on the Ad-Hoc Verify API. Proxies metafield reads and writes to BigCommerce's Management API server-to-server, bypassing browser CORS restrictions. Called by `bcMetafieldsProxy()` in `src/core/verify-api.ts`.\n\nAll requests pass `storeHash` + `storeAccessToken` in the body — they travel over HTTPS to `verify-api.ad-hoc.app` and are never sent directly to BC from the browser.\n\n`permission_set: 'app_only'` keeps the verification data private — only readable with these app credentials.",
+      "item": [
+        {
+          "name": "POST /bc-metafields  →  read cart metafields",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"read\",\n  \"storeHash\": \"{{store_hash}}\",\n  \"storeAccessToken\": \"{{store_access_token}}\",\n  \"resource\": \"cart\",\n  \"resourceId\": \"{{cart_id}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{api_base}}/bc-metafields",
+              "host": ["{{api_base}}"],
+              "path": ["bc-metafields"]
+            },
+            "description": "Reads all metafields for a cart. The plugin then looks for `namespace='Ad-Hoc Verify', key='verification'` via `findVerificationMetafield()`. Returns `{ data: BCRawMetafield[] }`."
+          },
+          "response": [
+            {
+              "name": "200 with metafield",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"data\": [\n    {\n      \"id\": 42,\n      \"namespace\": \"Ad-Hoc Verify\",\n      \"key\": \"verification\",\n      \"value\": \"{\\\"verificationId\\\":\\\"f47ac10b-...\\\",\\\"status\\\":\\\"completed\\\",\\\"completedAt\\\":\\\"...\\\",\\\"verification\\\":{\\\"success\\\":true,\\\"over_18\\\":true,\\\"over_21\\\":true,\\\"face_match_score\\\":\\\"definite_match\\\"}}\",\n      \"permission_set\": \"app_only\"\n    }\n  ]\n}"
+            },
+            {
+              "name": "200 empty",
+              "status": "OK",
+              "code": 200,
+              "body": "{ \"data\": [] }"
+            }
+          ]
+        },
+        {
+          "name": "POST /bc-metafields  →  write cart metafield (create)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"write\",\n  \"storeHash\": \"{{store_hash}}\",\n  \"storeAccessToken\": \"{{store_access_token}}\",\n  \"resource\": \"cart\",\n  \"resourceId\": \"{{cart_id}}\",\n  \"payload\": {\n    \"namespace\": \"Ad-Hoc Verify\",\n    \"key\": \"verification\",\n    \"permission_set\": \"app_only\",\n    \"value\": \"{\\\"verificationId\\\":\\\"{{verification_id}}\\\",\\\"status\\\":\\\"completed\\\",\\\"completedAt\\\":\\\"2026-03-31T12:05:00.000Z\\\",\\\"verification\\\":{\\\"success\\\":true,\\\"over_18\\\":true,\\\"over_21\\\":true,\\\"face_match_score\\\":\\\"definite_match\\\"}}\"\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{api_base}}/bc-metafields",
+              "host": ["{{api_base}}"],
+              "path": ["bc-metafields"]
+            },
+            "description": "Creates a new metafield on a cart (no `metafieldId` in body). Called by `saveCartMetafield()` after a successful verification. `permission_set: 'app_only'` hides the data from other BC apps."
+          }
+        },
+        {
+          "name": "POST /bc-metafields  →  write cart metafield (update)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"write\",\n  \"storeHash\": \"{{store_hash}}\",\n  \"storeAccessToken\": \"{{store_access_token}}\",\n  \"resource\": \"cart\",\n  \"resourceId\": \"{{cart_id}}\",\n  \"metafieldId\": 42,\n  \"payload\": {\n    \"namespace\": \"Ad-Hoc Verify\",\n    \"key\": \"verification\",\n    \"permission_set\": \"app_only\",\n    \"value\": \"{\\\"verificationId\\\":\\\"{{verification_id}}\\\",\\\"status\\\":\\\"completed\\\",\\\"completedAt\\\":\\\"2026-03-31T12:05:00.000Z\\\",\\\"verification\\\":{\\\"success\\\":true,\\\"over_18\\\":true,\\\"over_21\\\":true,\\\"face_match_score\\\":\\\"definite_match\\\"}}\"\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{api_base}}/bc-metafields",
+              "host": ["{{api_base}}"],
+              "path": ["bc-metafields"]
+            },
+            "description": "Updates an existing metafield. Include `metafieldId` (the `id` from a previous read) to update in place rather than creating a duplicate. The plugin uses `existingId` from `findVerificationMetafield()` for this."
+          }
+        },
+        {
+          "name": "POST /bc-metafields  →  read customer metafields",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"read\",\n  \"storeHash\": \"{{store_hash}}\",\n  \"storeAccessToken\": \"{{store_access_token}}\",\n  \"resource\": \"customer\",\n  \"resourceId\": \"{{customer_id}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{api_base}}/bc-metafields",
+              "host": ["{{api_base}}"],
+              "path": ["bc-metafields"]
+            },
+            "description": "Reads metafields for a logged-in customer. Customer metafields take precedence over cart metafields in `resolveOverallState()`. Only called when `customerId !== 0`."
+          }
+        },
+        {
+          "name": "POST /bc-metafields  →  write customer metafield",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"write\",\n  \"storeHash\": \"{{store_hash}}\",\n  \"storeAccessToken\": \"{{store_access_token}}\",\n  \"resource\": \"customer\",\n  \"resourceId\": \"{{customer_id}}\",\n  \"payload\": {\n    \"namespace\": \"Ad-Hoc Verify\",\n    \"key\": \"verification\",\n    \"permission_set\": \"app_only\",\n    \"value\": \"{\\\"verificationId\\\":\\\"{{verification_id}}\\\",\\\"status\\\":\\\"completed\\\",\\\"completedAt\\\":\\\"2026-03-31T12:05:00.000Z\\\",\\\"verification\\\":{\\\"success\\\":true,\\\"over_18\\\":true,\\\"over_21\\\":true,\\\"face_match_score\\\":\\\"definite_match\\\"}}\"\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{api_base}}/bc-metafields",
+              "host": ["{{api_base}}"],
+              "path": ["bc-metafields"]
+            },
+            "description": "Writes a verification result to a customer's metafields. For logged-in customers both cart and customer metafields are written. Customer metafield is used first on subsequent page loads."
+          }
+        }
+      ]
+    },
+    {
+      "name": "5 · BigCommerce Storefront API",
+      "description": "These are BC Storefront API calls made directly by `bigcommerce.js` from the store page — they're called against the store's own domain, not `verify-api.ad-hoc.app`.\n\n**These requests must be sent from a browser session on the store** (or use a BC store-domain cookie) — they won't work from Postman without cookie auth. Included here for documentation and curl-style testing.\n\nSet `bc_store_domain` to your store domain, e.g. `mystore.mybigcommerce.com`.",
+      "item": [
+        {
+          "name": "GET /api/storefront/carts  (BC Storefront API)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://{{bc_store_domain}}/api/storefront/carts?include=lineItems.physicalItems.options,lineItems.digitalItems.options",
+              "protocol": "https",
+              "host": ["{{bc_store_domain}}"],
+              "path": ["api", "storefront", "carts"],
+              "query": [
+                {
+                  "key": "include",
+                  "value": "lineItems.physicalItems.options,lineItems.digitalItems.options"
+                }
+              ]
+            },
+            "description": "Called by `loadCart()` in `src/bigcommerce/storefront/bc-adapter.ts`. Returns an array of carts. The plugin reads `data[0].id` (cartId) and `data[0].customerId`. Result is cached in IndexedDB for 5 minutes.\n\nRequires a browser session cookie on the store domain — not callable from Postman without cookie injection."
+          },
+          "response": [
+            {
+              "name": "200 with cart",
+              "status": "OK",
+              "code": 200,
+              "body": "[\n  {\n    \"id\": \"abc-cart-uuid\",\n    \"customerId\": 123,\n    \"lineItems\": { ... }\n  }\n]"
+            }
+          ]
+        },
+        {
+          "name": "GET /customer/current.jwt  (BC Storefront API)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://{{bc_store_domain}}/customer/current.jwt?app_client_id=REPLACE_WITH_BC_APP_CLIENT_ID",
+              "protocol": "https",
+              "host": ["{{bc_store_domain}}"],
+              "path": ["customer", "current.jwt"],
+              "query": [
+                {
+                  "key": "app_client_id",
+                  "value": "REPLACE_WITH_BC_APP_CLIENT_ID",
+                  "description": "The BC app client_id — injected at build time as __ADHOC_BC_CLIENT_ID__ in the Vite define. Same value as BC_CLIENT_ID env var."
+                }
+              ]
+            },
+            "description": "Called by `loadCustomerJwt()` in `src/bigcommerce/storefront/bc-adapter.ts`. Returns a signed JWT for the current logged-in customer. Used by the admin SPA to identify the customer context.\n\nReturns an empty string for guests. Cached in IndexedDB for 30 minutes.\n\nRequires a browser session cookie — not callable from Postman without cookie injection."
+          }
+        }
+      ]
+    }
+  ]
+}
