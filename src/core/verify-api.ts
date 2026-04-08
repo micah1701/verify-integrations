@@ -109,8 +109,10 @@ export function buildMetafieldPayload(
   return {
     namespace: 'Ad-Hoc Verify',
     key: 'verification',
-    // app_only keeps verification data private — only readable by this app's credentials.
-    permission_set: 'app_only',
+    // write_and_sf_access allows any Management API credentials to read (both the storefront's
+    // V2 API key and the admin's OAuth token). app_only would bind the metafield to the specific
+    // credential type that wrote it, making it invisible to the OAuth app token.
+    permission_set: 'write_and_sf_access',
     value: JSON.stringify(value),
   };
 }
