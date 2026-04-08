@@ -11,6 +11,7 @@ import {
   Text,
   H2,
   InlineMessage,
+  Small,
 } from '@bigcommerce/big-design';
 import { bcMetafieldsProxy } from '../../../core/verify-api.js';
 import { evaluateVerificationState } from '../../../core/verification-state.js';
@@ -22,15 +23,28 @@ interface Props {
 
 interface VerificationResult {
   orderId: string;
-  customerId: string | null;
+  customerId: number;
   metafield: MetafieldValue | null;
   state: string;
+  source: 'order' | 'customer' | null;
 }
 
-// Proxy returns the customer's metafields array + the customerId it resolved from the order.
+// Proxy returns the order's metafields + the customerId it resolved from the order.
 interface OrderProxyResponse {
   data: BCRawMetafield[];
   resolvedCustomerId: number;
+}
+
+interface CustomerProxyResponse {
+  data: BCRawMetafield[];
+}
+
+function findVerifyMetafield(metafields: BCRawMetafield[]): MetafieldValue | null {
+  const mf = metafields.find(
+    (m) => m.namespace === 'Ad-Hoc Verify' && m.key === 'verification',
+  );
+  if (!mf) return null;
+  try { return JSON.parse(mf.value) as MetafieldValue; } catch (_) { return null; }
 }
 
 export default function OrderVerificationPage({ config }: Props) {
@@ -49,6 +63,8 @@ export default function OrderVerificationPage({ config }: Props) {
     setResult(null);
 
     try {
+      // Step 1: Read order metafields directly. The proxy also returns resolvedCustomerId
+      // (the BC customer linked to this order, 0 for guests).
       const orderData = await bcMetafieldsProxy<OrderProxyResponse>(config.apiBase, {
         action: 'read',
         storeHash: config.storeHash,
@@ -62,12 +78,25 @@ export default function OrderVerificationPage({ config }: Props) {
         return;
       }
 
-      const verifyMf = orderData.data.find(
-        (mf) => mf.namespace === 'Ad-Hoc Verify' && mf.key === 'verification',
-      );
-      let mfValue: MetafieldValue | null = null;
-      if (verifyMf) {
-        try { mfValue = JSON.parse(verifyMf.value) as MetafieldValue; } catch (_) {}
+      const resolvedCustomerId = orderData.resolvedCustomerId ?? 0;
+      let mfValue = findVerifyMetafield(orderData.data);
+      let source: 'order' | 'customer' | null = mfValue ? 'order' : null;
+
+      // Step 2: If no order metafield and the order has a linked customer, check
+      // customer metafields as a fallback (covers orders placed before order-metafield
+      // writing was added, and logged-in customers who verified before checking out).
+      if (!mfValue && resolvedCustomerId > 0) {
+        const customerData = await bcMetafieldsProxy<CustomerProxyResponse>(config.apiBase, {
+          action: 'read',
+          storeHash: config.storeHash,
+          storeAccessToken: config.storeAccessToken,
+          resource: 'customer',
+          resourceId: String(resolvedCustomerId),
+        });
+        if (customerData) {
+          mfValue = findVerifyMetafield(customerData.data);
+          if (mfValue) source = 'customer';
+        }
       }
 
       const state = evaluateVerificationState(mfValue, {
@@ -77,12 +106,7 @@ export default function OrderVerificationPage({ config }: Props) {
         requireOver21: false,
       });
 
-      setResult({
-        orderId: id,
-        customerId: String(orderData.resolvedCustomerId),
-        metafield: mfValue,
-        state,
-      });
+      setResult({ orderId: id, customerId: resolvedCustomerId, metafield: mfValue, state, source });
     } catch (err) {
       setError((err as Error).message ?? 'Lookup failed');
     } finally {
@@ -120,7 +144,7 @@ export default function OrderVerificationPage({ config }: Props) {
 
       {result && (
         <Panel
-          header={`Order ${result.orderId}${result.customerId ? ` (Customer ${result.customerId})` : ''} — Verification Status`}
+          header={`Order ${result.orderId}${result.customerId > 0 ? ` — Customer ${result.customerId}` : ' — Guest'}`}
         >
           {result.metafield === null ? (
             <Text>No verification record found for this order.</Text>
@@ -132,6 +156,11 @@ export default function OrderVerificationPage({ config }: Props) {
                   variant={result.state === 'verified' ? 'success' : 'danger'}
                 />
               </H2>
+              {result.source === 'customer' && (
+                <Small>
+                  Verification found on customer record (Customer {result.customerId}). No separate order-level record exists.
+                </Small>
+              )}
               <Table
                 columns={[
                   { header: 'Field', hash: 'field', render: (row) => row.field },
