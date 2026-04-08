@@ -29,10 +29,11 @@ interface VerificationResult {
   source: 'order' | 'customer' | null;
 }
 
-// Proxy returns the order's metafields + the customerId it resolved from the order.
+// Proxy returns cart metafields resolved via the order's cart_id, plus order context.
 interface OrderProxyResponse {
   data: BCRawMetafield[];
   resolvedCustomerId: number;
+  cartId: string;
 }
 
 interface CustomerProxyResponse {
