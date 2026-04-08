@@ -30,12 +30,13 @@ import {
   findVerificationMetafield,
   saveCartMetafield,
   saveCustomerMetafield,
+  saveOrderMetafield,
   invalidateMetafieldCache,
 } from './bc-adapter.js';
 import { renderCheckoutBlock, removeCheckoutBlock } from './checkout-block.js';
 import { resolveOverallState } from '../../core/verification-state.js';
 import { createVerification } from '../../core/verify-api.js';
-import type { AdHocVerifyConfig, VerificationOutcome, VerificationState } from '../../core/types.js';
+import type { AdHocVerifyConfig, VerificationOutcome, VerificationState, VerificationStatus } from '../../core/types.js';
 
 // Injected at build time via Vite define
 declare const __ADHOC_BC_CLIENT_ID__: string;
@@ -80,21 +81,66 @@ const config: AdHocVerifyConfig = {
 
 // ─── 2. Page Guard ───────────────────────────────────────────────────────────
 
-function detectPage(): 'cart' | 'checkout' | null {
+function detectPage(): 'cart' | 'checkout' | 'order-confirmation' | null {
+  if ((window as Window & { BCData?: { order_id?: number } }).BCData?.order_id) return 'order-confirmation';
   const p = window.location.pathname;
   if (p.includes('/cart')) return 'cart';
   if (p.includes('/checkout')) return 'checkout';
+  if (p.includes('/order-confirmation')) return 'order-confirmation';
   return null;
 }
 
 const currentPage = detectPage();
 const configPages = Array.isArray(config.pages) ? config.pages : ['cart'];
 
+// ─── 3. Session Keys ─────────────────────────────────────────────────────────
+
+// Pending: set when modal opens, cleared on completion. Reuses the same verification if modal
+// is reopened mid-session.
+const SESSION_KEY = `adhoc_verify_pending_${config.integrationKey}`;
+
+// Completed: set when verification finishes, survives page navigation within the same session.
+// Used to backfill the customer metafield after login/account creation, and to write the order
+// metafield on the order confirmation page.
+const COMPLETED_KEY = `adhoc_verify_done_${config.integrationKey}`;
+
+// ─── 4. Order Confirmation Handler ───────────────────────────────────────────
+
+async function handleOrderConfirmationPage(): Promise<void> {
+  if (!config.storeHash || !config.storeAccessToken) return;
+  const completedJson = sessionStorage.getItem(COMPLETED_KEY);
+  if (!completedJson) return;
+
+  const bcData = (window as Window & { BCData?: { order_id?: number } }).BCData;
+  const orderId =
+    bcData?.order_id?.toString() ??
+    window.location.pathname.match(/\/order-confirmation\/(\d+)/)?.[1] ??
+    null;
+  if (!orderId) return;
+
+  try {
+    const { verificationId, result, status } = JSON.parse(completedJson) as {
+      verificationId: string;
+      result: VerificationOutcome | null;
+      status: VerificationStatus;
+    };
+    await saveOrderMetafield(
+      config.apiBase,
+      config.storeHash,
+      config.storeAccessToken,
+      orderId,
+      verificationId,
+      result,
+      status,
+    );
+  } catch (_) {}
+}
+
 if (currentPage && configPages.includes(currentPage)) {
 
 const isCheckout = currentPage === 'checkout';
 
-// ─── 3. Container ────────────────────────────────────────────────────────────
+// ─── 5. Container ────────────────────────────────────────────────────────────
 
 const CONTAINER_ID = 'adhoc-verify-container';
 
@@ -120,7 +166,7 @@ function findOrCreateContainer(): HTMLElement {
   return container;
 }
 
-// ─── 4. Cart Context (set during init) ──────────────────────────────────────
+// ─── 4b. Cart Context (set during init) ──────────────────────────────────────
 
 let _cartId = '';
 let _customerId = 0;
@@ -163,6 +209,7 @@ async function saveVerificationAndRefreshUI(
   }
   await Promise.all(saves);
   await invalidateMetafieldCache(_cartId, _customerId);
+  sessionStorage.setItem(COMPLETED_KEY, JSON.stringify({ verificationId: id, result, status: 'completed' }));
 
   // Update Svelte component prop → StatusCard re-renders
   statusCardInstance?.$set({ state: 'verified' as VerificationState });
@@ -211,6 +258,7 @@ async function handleManualReviewResult(id: string): Promise<void> {
   }
   await Promise.all(saves);
   await invalidateMetafieldCache(_cartId, _customerId);
+  sessionStorage.setItem(COMPLETED_KEY, JSON.stringify({ verificationId: id, result: null, status: 'manual_review' }));
 
   const reviewCfg = config.manualReview!;
   const msg = reviewCfg.message !== undefined ? reviewCfg.message : defaults.manualReview!.message;
@@ -266,6 +314,50 @@ async function init(): Promise<void> {
   _cartMfId = resolved.cartMfId ?? undefined;
   _customerMfId = resolved.customerMfId ?? undefined;
 
+  // Backfill: if now logged in but no customer metafield, check for a completed verification
+  // from earlier in this session (e.g. verified as guest, then created an account).
+  if (_customerId !== 0 && !customerMf && config.storeHash && config.storeAccessToken) {
+    const completedJson = sessionStorage.getItem(COMPLETED_KEY);
+    if (completedJson) {
+      try {
+        const { verificationId, result, status } = JSON.parse(completedJson) as {
+          verificationId: string;
+          result: VerificationOutcome | null;
+          status: VerificationStatus;
+        };
+        await saveCustomerMetafield(
+          config.apiBase,
+          config.storeHash,
+          config.storeAccessToken,
+          _customerId,
+          verificationId,
+          result,
+          undefined,
+          status,
+        );
+        await invalidateMetafieldCache(_cartId, _customerId);
+        const backfilledMf = {
+          id: 0,
+          value: {
+            verificationId,
+            status,
+            completedAt: '',
+            verification: result ?? { success: null, over_18: null, over_21: null, face_match_score: null },
+          },
+        };
+        const reresolved = resolveOverallState(cartMf, backfilledMf, config.ruleset);
+        _customerMfId = reresolved.customerMfId ?? undefined;
+        mountStatusCard(container, reresolved.state);
+        if (reresolved.state === 'pending_review') {
+          if (isCheckout && config.manualReview?.blockCheckout) renderCheckoutBlock();
+        } else if (reresolved.state !== 'verified' && isCheckout && config.ruleset.requireVerification) {
+          renderCheckoutBlock();
+        }
+        return;
+      } catch (_) {}
+    }
+  }
+
   mountStatusCard(container, resolved.state);
 
   if (resolved.state === 'pending_review') {
@@ -295,8 +387,6 @@ function mountStatusCard(container: HTMLElement, initialState: VerificationState
 
   statusCardInstance.$on('verify', () => void handleVerifyClick());
 }
-
-const SESSION_KEY = `adhoc_verify_pending_${config.integrationKey}`;
 
 async function handleVerifyClick(): Promise<void> {
   if (modalWrapperEl) return; // Modal already open
@@ -355,4 +445,14 @@ if (document.readyState === 'loading') {
 }
 
 } // end page guard
+
+// Order confirmation: runs silently regardless of configPages, writes order metafield.
+if (currentPage === 'order-confirmation') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => void handleOrderConfirmationPage());
+  } else {
+    void handleOrderConfirmationPage();
+  }
+}
+
 } // end integrationKey guard

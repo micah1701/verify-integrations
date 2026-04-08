@@ -172,6 +172,28 @@ export async function saveCustomerMetafield(
   return data !== null;
 }
 
+export async function saveOrderMetafield(
+  apiBase: string,
+  storeHash: string,
+  storeAccessToken: string,
+  orderId: string,
+  verificationId: string,
+  result: VerificationOutcome | null,
+  status: VerificationStatus = 'completed',
+): Promise<boolean> {
+  if (!orderId) return false;
+  const payload = buildMetafieldPayload(verificationId, result, status);
+  const data = await bcMetafieldsProxy(apiBase, {
+    action: 'write',
+    storeHash,
+    storeAccessToken,
+    resource: 'order',
+    resourceId: orderId,
+    payload,
+  });
+  return data !== null;
+}
+
 // ─── Cache invalidation ───────────────────────────────────────────────────────
 
 export async function invalidateMetafieldCache(
