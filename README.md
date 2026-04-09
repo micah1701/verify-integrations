@@ -9,8 +9,9 @@ A multi-integration identity verification platform. Merchants install this to re
 1. A merchant registers the app in the BigCommerce Developer Portal and installs it on their store
 2. The Node.js backend receives the OAuth callback, exchanges the code for an access token, and stores it
 3. When the merchant opens the app from their BC admin panel, the server verifies the BC-signed JWT, looks up the stored token, and serves the admin SPA with the store credentials injected
-4. The merchant adds the storefront script to their store via BC Script Manager — this is a self-contained IIFE that talks directly to Ad-Hoc Verify, no backend required
-5. Customers trigger a verification flow via a modal on the cart/checkout page; results are stored in BC metafields
+4. The merchant uses the **Integration Config** tab in the admin SPA to store their BC credentials and verification settings in the Ad-Hoc Verify template (`integration_config`)
+5. The merchant adds the storefront script to their store via BC Script Manager — a self-contained IIFE that only needs `integrationKey` + `templateId`; all other config is fetched from the template at runtime
+6. Customers trigger a verification flow via a modal on the cart/checkout page; results are stored in BC metafields
 
 ---
 
@@ -35,7 +36,8 @@ src/
         ├── App.tsx          # Tabbed layout — reads window.AdHocAdminConfig
         └── pages/
             ├── CustomerVerificationPage.tsx
-            └── OrderVerificationPage.tsx
+            ├── OrderVerificationPage.tsx
+            └── IntegrationConfigPage.tsx
 
 server/                      # Node.js/Express backend
 ├── index.ts                 # Entry point
@@ -239,18 +241,32 @@ pm2 delete verify-integrations    # remove from pm2 process list entirely
 
 Click the installation link (or find it in the BC App Marketplace). Authorize the requested permissions. The backend handles the OAuth handshake automatically.
 
-### Step 2 — Obtain an Ad-Hoc Verify Integration Key
+### Step 2 — Set Up an Ad-Hoc Verify Integration Key and Template
 
 1. Sign up at [Ad-Hoc Verify](https://verify.ad-hoc.app)
-2. Create an integration for your BigCommerce store
-3. Copy the **Integration Key**
+2. Create an integration and copy your **Integration Key** (`ahv_pub_...`)
+3. Add your store's domain to the Integration Key allowlist (e.g., `yourstore.mybigcommerce.com`)
+4. Create a **verification template** in the dashboard and note its UUID
 
-### Step 3 — Add the Storefront Script via Script Manager
+### Step 3 — Configure the Template via the Admin Panel
+
+Open the BC admin panel → **Apps → Ad-Hoc Verify → Integration Config** tab.
+
+1. Enter your **Integration Key** and **Template ID**, then click **Load Config**
+2. Click **Edit** (you'll be prompted for your Ad-Hoc Verify account credentials)
+3. Fill in your store details:
+   - **Store Hash** — the short alphanumeric code from your BC store URL
+   - **Store Access Token** — from a BC store-level API account (**Settings → Store-level API accounts**; required scopes: **Carts** read/write, **Customers** read/write)
+   - **Pages** — which pages to show the verification UI on (`cart`, `checkout`, `order-confirmation`)
+   - **Ruleset** — verification pass/fail thresholds
+4. Click **Save**
+
+### Step 4 — Add the Storefront Script via Script Manager
 
 In the BigCommerce admin: **Storefront → Script Manager → Create a Script**
 
 - **Location on page** — Footer
-- **Pages** — Checkout (add All Pages too if you want the badge on cart pages)
+- **Pages** — All Pages
 - **Script type** — Script
 
 Paste the following, replacing the placeholder values:
@@ -258,30 +274,21 @@ Paste the following, replacing the placeholder values:
 ```html
 <script>
   window.AdHocVerifyConfig = {
-    integrationKey: "YOUR_INTEGRATION_KEY_HERE",
-
-    // Block the checkout button until the customer has verified
-    blockCheckout: true,
-
-    // Optional: require re-verification after N days
-    // maxAgeDays: 30,
-
-    // Optional: minimum face match confidence
-    // minFaceMatch: "likely_match",
-
-    // Optional: require customer to be 21+
-    // requireAge21: true,
+    integrationKey: "ahv_pub_...",
+    templateId:     "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
   };
 </script>
-<script src="https://YOUR_CDN_URL/bigcommerce.js" defer></script>
+<script src="https://verify-integrations.ad-hoc.app/storefront/bigcommerce.js"></script>
 ```
 
-### Step 4 — Test
+That's all that's needed in the script tag. The plugin fetches everything else (store credentials, pages, ruleset, etc.) from the template at runtime.
+
+### Step 5 — Test
 
 1. Add an item to cart and go to checkout
-2. With `blockCheckout: true`, the checkout button should be replaced with a "Verify ID" prompt
-3. Complete a test verification — the modal should open, run the flow, then close and re-enable checkout
-4. Open the admin dashboard from the BC Admin panel (under **Apps**) to view verification results
+2. The checkout button should be replaced or blocked by a "Verify ID" prompt (if `ruleset.requireVerification` is set in your template config)
+3. Complete a test verification — the modal should open, run the flow, then close and restore checkout
+4. Open the admin dashboard (**Apps → Ad-Hoc Verify**) to look up the verification result by customer or order ID
 
 ---
 
@@ -293,16 +300,27 @@ The storefront plugin (`dist/storefront/bigcommerce.js`) is a static file — up
 
 ## Configuration Reference
 
-All options are set via `window.AdHocVerifyConfig` in the Script Manager snippet.
+All options are set via `window.AdHocVerifyConfig` in the Script Manager snippet. When `templateId` is provided, the plugin fetches the template's `integration_config` from the Ad-Hoc Verify API at boot and uses those values as defaults — anything set in the script tag takes precedence.
+
+The recommended approach is to keep the script tag minimal and manage all store-specific settings through the **Integration Config** tab in the admin panel.
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `integrationKey` | `string` | **Required** | Ad-Hoc Verify integration key |
-| `blockCheckout` | `boolean` | `false` | Disable checkout button until verified |
-| `maxAgeDays` | `number` | — | Re-verify after N days |
-| `minFaceMatch` | `string` | — | Minimum face match tier (`definite_match`, `likely_match`, `possible_match`) |
-| `requireAge21` | `boolean` | `false` | Require customer to be 21+ |
-| `onVerified` | `function` | — | Callback fired after successful verification |
+| `integrationKey` | `string` | **Required** | Ad-Hoc Verify integration key (`ahv_pub_...`) |
+| `templateId` | `string` | Recommended | Template UUID — all other config is fetched from this template's `integration_config` |
+| `storeHash` | `string` | From template | BC store hash — set via Integration Config tab, not the script tag |
+| `storeAccessToken` | `string` | From template | BC store-level API access token — set via Integration Config tab |
+| `pages` | `string[]` | From template | Pages to activate: `'cart'`, `'checkout'`, `'order-confirmation'` |
+| `ruleset.requireVerification` | `boolean` | `true` | Disable checkout until verified |
+| `ruleset.minFaceMatchScore` | `string\|null` | `null` | Minimum face match tier: `'definite_match'`, `'likely_match'`, `'possible_match'` |
+| `ruleset.requireOver18` | `boolean` | `false` | Fail if `over_18` is false |
+| `ruleset.requireOver21` | `boolean` | `false` | Fail if `over_21` is false |
+| `manualReview.blockCheckout` | `boolean` | `false` | Block checkout during manual review |
+| `manualReview.message` | `string\|null` | Default message | Message shown during manual review; `null` hides it |
+| `buttonText` | `string` | `'Verify ID'` | Verify button label |
+| `selector` | `string` | `'.cart-actions'` | CSS selector for the UI injection point |
+| `onComplete` | `function(id)` | — | Callback with verification ID on completion |
+| `onResult` | `function(result)` | — | Callback with `{ verificationId, success, over_18, over_21, face_match_score }` |
 
 ---
 

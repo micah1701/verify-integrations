@@ -209,30 +209,28 @@ A ready-made plugin (`static/plugin/bigcommerce.js`) is available for BigCommerc
 
 **1. Get an integration key** from Profile → Integration Key in your Ad-Hoc Verify dashboard. Add your store domain to the allowlist (e.g., `yourstore.mybigcommerce.com`).
 
-**2. Create a store-level API account** in the BC control panel:
-Settings → Store-level API accounts → Create API account
-Required scopes: **Carts** (read/write) and **Customers** (read/write)
-Save the generated `Access Token` and note your `Store Hash` from the store URL.
+**2. Create a verification template** in the Ad-Hoc Verify dashboard. Note the template UUID.
 
-**3. Add to Script Manager** (all pages, footer):
+**3. Configure the template's store credentials** via the **Integration Config** tab in the BC admin app (Apps → Ad-Hoc Verify → Integration Config). Enter your Integration Key and Template ID, load the config, then click Edit (requires your Ad-Hoc Verify credentials) and fill in:
+- **Store Hash** — from your BC store URL
+- **Store Access Token** — from a BC store-level API account (Settings → Store-level API accounts; required scopes: Carts read/write, Customers read/write)
+- **Pages**, **Ruleset**, and any other UI settings
+
+**4. Add to Script Manager** (all pages, footer):
 
 ```html
 <script>
   window.AdHocVerifyConfig = {
-    apiKey:           'ahv_pub_...',     // Your Ad-Hoc Verify integration key
-    storeHash:        'abc123',          // Your BigCommerce store hash
-    storeAccessToken: 'TOKEN',           // X-Auth-Token from your store-level API account
-    pages:            ['cart', 'checkout'],
-    ruleset: {
-      requireVerification: true,         // Block checkout without verification
-      minFaceMatchScore: null,           // 'definite_match' | 'likely_match' | 'possible_match' | null
-      requireOver18: false,
-      requireOver21: false,
-    }
+    integrationKey: 'ahv_pub_...',              // Your Ad-Hoc Verify integration key
+    templateId:     'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',  // Your template UUID
   };
 </script>
-<script src="https://verify.ad-hoc.app/plugin/bigcommerce.js"></script>
+<script src="https://verify-integrations.ad-hoc.app/storefront/bigcommerce.js"></script>
 ```
+
+The plugin fetches all other configuration (storeHash, storeAccessToken, pages, ruleset, etc.) from the template at runtime — no other values need to appear in the script tag.
+
+Any value you _do_ set in `window.AdHocVerifyConfig` overrides the template config for that store, which is useful for per-environment overrides during development.
 
 ### What the Plugin Does
 
@@ -259,7 +257,7 @@ This bypasses the browser CORS restriction on `api.bigcommerce.com`. The proxy v
 {
   "namespace": "Ad-Hoc Verify",
   "key": "verification",
-  "permission_set": "app_only",
+  "permission_set": "write_and_sf_access",
   "value": "{\"verificationId\":\"uuid\",\"status\":\"completed\",\"completedAt\":\"...\",\"verification\":{\"success\":true,\"over_18\":true,\"over_21\":true,\"face_match_score\":\"definite_match\"}}"
 }
 ```
@@ -268,21 +266,52 @@ Saved to cart metafields for guests; also to customer metafields for logged-in c
 
 ### Plugin Config Reference
 
+When `templateId` is set, the plugin fetches `integration_config` from the template at boot and uses those values as defaults. Anything set in `window.AdHocVerifyConfig` takes precedence over the template config.
+
 | Option | Type | Required | Description |
 |---|---|---|---|
-| `apiKey` | string | Yes | Integration key (`ahv_pub_...`) |
-| `storeHash` | string | For metafields | BC store hash |
-| `storeAccessToken` | string | For metafields | BC store-level API access token |
-| `templateId` | UUID string | No | Pre-configured verification template |
-| `buttonText` | string | No | Button label (default: `'Verify ID'`) |
-| `selector` | CSS selector | No | Where to inject the UI (default: `.cart-actions`) |
-| `pages` | string[] | No | Pages to activate: `'cart'`, `'checkout'` (default: `['cart']`) |
+| `integrationKey` | string | **Yes** | Integration key (`ahv_pub_...`) |
+| `templateId` | UUID string | Recommended | Template whose `integration_config` is fetched at boot to supply all other settings |
+| `storeHash` | string | For metafields | BC store hash — usually stored in `integration_config`, not the script tag |
+| `storeAccessToken` | string | For metafields | BC store-level API access token — usually stored in `integration_config` |
+| `pages` | string[] | No | Pages to activate: `'cart'`, `'checkout'`, `'order-confirmation'` (default: `['cart']`) |
 | `ruleset.requireVerification` | boolean | No | Disable checkout button until verified (default: `true`) |
-| `ruleset.minFaceMatchScore` | string\|null | No | Minimum acceptable face match tier |
+| `ruleset.minFaceMatchScore` | string\|null | No | Minimum acceptable face match tier: `'definite_match'`, `'likely_match'`, `'possible_match'`, or `null` |
 | `ruleset.requireOver18` | boolean | No | Fail verification if `over_18` is false |
 | `ruleset.requireOver21` | boolean | No | Fail verification if `over_21` is false |
+| `manualReview.blockCheckout` | boolean | No | Block checkout while verification is pending manual review (default: `false`) |
+| `manualReview.message` | string\|null | No | Message shown during manual review; `null` hides it |
+| `buttonText` | string | No | Button label (default: `'Verify ID'`) |
+| `selector` | CSS selector | No | Where to inject the UI (default: `.cart-actions`) |
+| `apiBase` | string | No | Ad-Hoc Verify API base URL (default: `https://verify-api.ad-hoc.app`) |
+| `verifyBase` | string | No | Ad-Hoc Verify app base URL (default: `https://verify.ad-hoc.app`) |
 | `onComplete` | function(id) | No | Callback with verification ID on completion |
 | `onResult` | function(result) | No | Callback with `{ verificationId, success, over_18, over_21, face_match_score }` |
+
+### Integration Config (Template-Driven Configuration)
+
+Store-specific settings are stored in `verification_templates.integration_config` (a JSONB column) and fetched by the storefront plugin at runtime. This means the Script Manager snippet only needs two values — `integrationKey` and `templateId` — and the template holds everything else.
+
+**To read the template config** (storefront, no auth beyond the integration key):
+
+```bash
+GET https://verify-api.ad-hoc.app/get-template-config?template_id=<uuid>
+X-API-Key: ahv_pub_...
+```
+
+Response: the `IntegrationConfig` object (`storeHash`, `storeAccessToken`, `pages`, `ruleset`, `manualReview`, `buttonText`, `selector`).
+
+**To update the template config** (requires a Bearer token — use `POST /api/auth` first):
+
+```bash
+PATCH https://verify-api.ad-hoc.app/api/templates/<uuid>
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{ "integration_config": { ...fields... } }
+```
+
+The **Integration Config** tab in the BC admin app (Apps → Ad-Hoc Verify) provides a form-based UI for reading and editing this config without making raw API calls.
 
 ---
 
@@ -359,6 +388,8 @@ Common codes: `MISSING_AUTH`, `UNAUTHORIZED`, `VALIDATION_ERROR`, `NOT_FOUND`, `
 | `GET /api/verification?id=...` | Bearer token | Get status + full results |
 | `POST /create-verification` | `X-API-Key` | Create verification (integration key) |
 | `GET /get-verification-result?id=...` | Public | Poll status + safe outcome fields |
+| `GET /get-template-config?template_id=...` | `X-API-Key` | Fetch `integration_config` from a template |
+| `PATCH /api/templates/:id` | Bearer token | Update template fields including `integration_config` |
 | `POST /bc-metafields` | Public (passes storeAccessToken in body) | BC metafields proxy — read/write cart or customer metafields |
 | `POST /retry-webhook` | Bearer token | Retry a failed webhook delivery |
 | `POST /purge-pii` | Bearer token | Delete stored PII and face images |
