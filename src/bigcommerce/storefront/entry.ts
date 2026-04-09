@@ -35,8 +35,8 @@ import {
 } from './bc-adapter.js';
 import { renderCheckoutBlock, removeCheckoutBlock } from './checkout-block.js';
 import { resolveOverallState } from '../../core/verification-state.js';
-import { createVerification } from '../../core/verify-api.js';
-import type { AdHocVerifyConfig, VerificationOutcome, VerificationState, VerificationStatus } from '../../core/types.js';
+import { createVerification, getTemplateIntegrationConfig } from '../../core/verify-api.js';
+import type { AdHocVerifyConfig, IntegrationConfig, VerificationOutcome, VerificationState, VerificationStatus } from '../../core/types.js';
 
 // Injected at build time via Vite define
 declare const __ADHOC_BC_CLIENT_ID__: string;
@@ -70,7 +70,7 @@ if (!userConfig.integrationKey) {
   // Stop execution without throwing (IIFE — a throw here would surface as uncaught)
 } else {
 
-const config: AdHocVerifyConfig = {
+let config: AdHocVerifyConfig = {
   ...defaults,
   ...userConfig,
   // Deep-merge ruleset so partial overrides still pick up defaults
@@ -438,10 +438,35 @@ function destroyModal(modal: InstanceType<typeof VerifyModal>): void {
 
 // ─── 8. Bootstrap ────────────────────────────────────────────────────────────
 
+// If a templateId is provided, fetch integration_config from the API and apply
+// remote values for any fields the merchant did not explicitly set in the script tag.
+// window.AdHocVerifyConfig always wins; remote config fills in everything else.
+async function applyRemoteConfig(remote: IntegrationConfig): Promise<void> {
+  if (!userConfig.storeHash && remote.storeHash) config.storeHash = remote.storeHash;
+  if (!userConfig.storeAccessToken && remote.storeAccessToken) config.storeAccessToken = remote.storeAccessToken;
+  if (!userConfig.pages && remote.pages) config.pages = remote.pages;
+  if (!userConfig.ruleset && remote.ruleset) config.ruleset = { ...defaults.ruleset, ...remote.ruleset };
+  if (!userConfig.manualReview && remote.manualReview) config.manualReview = { ...defaults.manualReview, ...remote.manualReview };
+  if (!userConfig.buttonText && remote.buttonText) config.buttonText = remote.buttonText;
+  if (!userConfig.selector && remote.selector) config.selector = remote.selector;
+}
+
+async function bootstrap(): Promise<void> {
+  if (userConfig.templateId) {
+    const remote = await getTemplateIntegrationConfig(
+      config.apiBase,
+      config.integrationKey,
+      userConfig.templateId,
+    );
+    if (remote) await applyRemoteConfig(remote);
+  }
+  await init();
+}
+
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => void init());
+  document.addEventListener('DOMContentLoaded', () => void bootstrap());
 } else {
-  void init();
+  void bootstrap();
 }
 
 } // end page guard

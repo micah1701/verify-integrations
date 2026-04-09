@@ -4,6 +4,7 @@ import { theme } from '@bigcommerce/big-design-theme';
 import { ThemeProvider } from 'styled-components';
 import CustomerVerificationPage from './pages/CustomerVerificationPage.js';
 import OrderVerificationPage from './pages/OrderVerificationPage.js';
+import IntegrationConfigPage from './pages/IntegrationConfigPage.js';
 import type { AdHocAdminConfig } from '../../core/types.js';
 
 // Admin config injected by the BC app backend (or for dev: set directly on window)
@@ -15,11 +16,12 @@ const adminConfig = (
   storeAccessToken: '',
 };
 
-type TabId = 'customer' | 'order';
+type TabId = 'customer' | 'order' | 'integration-config';
 
 const TABS = [
   { id: 'customer' as TabId, title: 'Customer Verification' },
   { id: 'order' as TabId, title: 'Order Verification' },
+  { id: 'integration-config' as TabId, title: 'Integration Config' },
 ];
 
 export default function App() {
@@ -37,6 +39,7 @@ export default function App() {
         <div style={{ marginTop: '24px' }}>
           {activeTab === 'customer' && <CustomerVerificationPage config={adminConfig} />}
           {activeTab === 'order' && <OrderVerificationPage config={adminConfig} />}
+          {activeTab === 'integration-config' && <IntegrationConfigPage config={adminConfig} />}
         </div>
       </div>
     </ThemeProvider>

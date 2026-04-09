@@ -95,6 +95,18 @@ export interface VerificationResultCallback {
   face_match_score: FaceMatchScore | null;
 }
 
+// ─── Integration Config (stored in verification_templates.integration_config) ──
+
+export interface IntegrationConfig {
+  storeHash?: string;
+  storeAccessToken?: string;
+  pages?: Array<'cart' | 'checkout' | 'order-confirmation'>;
+  ruleset?: Ruleset;
+  manualReview?: Partial<ManualReviewConfig>;
+  buttonText?: string;
+  selector?: string;
+}
+
 // ─── Admin Config (window.AdHocAdminConfig) ───────────────────────────────────
 
 export interface AdHocAdminConfig {

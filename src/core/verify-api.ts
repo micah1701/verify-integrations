@@ -1,4 +1,4 @@
-import type { MetafieldValue, VerificationOutcome, VerificationStatus } from './types.js';
+import type { IntegrationConfig, MetafieldValue, VerificationOutcome, VerificationStatus } from './types.js';
 
 // ─── Generic fetch helper ─────────────────────────────────────────────────────
 
@@ -86,6 +86,59 @@ export async function bcMetafieldsProxy<T>(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
+}
+
+// ─── Template integration_config ─────────────────────────────────────────────
+
+export async function getTemplateIntegrationConfig(
+  apiBase: string,
+  integrationKey: string,
+  templateId: string,
+): Promise<IntegrationConfig | null> {
+  return safeFetch<IntegrationConfig>(
+    `${apiBase}/get-template-config?template_id=${encodeURIComponent(templateId)}`,
+    { headers: { 'X-API-Key': integrationKey } },
+  );
+}
+
+export interface AdhocAuthResponse {
+  access_token: string;
+  expires_in: number;
+}
+
+export async function loginToAdhocApi(
+  apiBase: string,
+  email: string,
+  password: string,
+): Promise<AdhocAuthResponse | null> {
+  return safeFetch<AdhocAuthResponse>(`${apiBase}/api/auth`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+export async function updateTemplateIntegrationConfig(
+  apiBase: string,
+  bearerToken: string,
+  templateId: string,
+  config: IntegrationConfig,
+): Promise<boolean> {
+  try {
+    const r = await fetch(`${apiBase}/api/templates/${encodeURIComponent(templateId)}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${bearerToken}`,
+      },
+      body: JSON.stringify({ integration_config: config }),
+    });
+    if (r.status === 401) throw new Error('unauthorized');
+    return r.ok;
+  } catch (e) {
+    if (e instanceof Error && e.message === 'unauthorized') throw e;
+    return false;
+  }
 }
 
 // ─── Metafield payload builder ────────────────────────────────────────────────
