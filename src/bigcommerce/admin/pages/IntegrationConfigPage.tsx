@@ -11,7 +11,6 @@ import {
   Modal,
   Checkbox,
   Select,
-  Toggle,
   Textarea,
   HR,
 } from '@bigcommerce/big-design';
@@ -430,11 +429,11 @@ function EditForm({
 
       {/* Ruleset */}
       <FormGroup>
-        <FormControlLabel>Require Verification</FormControlLabel>
-        <Toggle
+        <Checkbox
+          label="Require Verification"
           checked={ruleset.requireVerification}
-          onChange={(checked) =>
-            updateDraft({ ruleset: { ...ruleset, requireVerification: checked } })
+          onChange={(e) =>
+            updateDraft({ ruleset: { ...ruleset, requireVerification: e.target.checked } })
           }
         />
       </FormGroup>
@@ -455,20 +454,20 @@ function EditForm({
         />
       </FormGroup>
       <FormGroup>
-        <FormControlLabel>Require Over 18</FormControlLabel>
-        <Toggle
+        <Checkbox
+          label="Require Over 18"
           checked={ruleset.requireOver18}
-          onChange={(checked) =>
-            updateDraft({ ruleset: { ...ruleset, requireOver18: checked } })
+          onChange={(e) =>
+            updateDraft({ ruleset: { ...ruleset, requireOver18: e.target.checked } })
           }
         />
       </FormGroup>
       <FormGroup>
-        <FormControlLabel>Require Over 21</FormControlLabel>
-        <Toggle
+        <Checkbox
+          label="Require Over 21"
           checked={ruleset.requireOver21}
-          onChange={(checked) =>
-            updateDraft({ ruleset: { ...ruleset, requireOver21: checked } })
+          onChange={(e) =>
+            updateDraft({ ruleset: { ...ruleset, requireOver21: e.target.checked } })
           }
         />
       </FormGroup>
@@ -477,11 +476,11 @@ function EditForm({
 
       {/* Manual review */}
       <FormGroup>
-        <FormControlLabel>Block Checkout During Manual Review</FormControlLabel>
-        <Toggle
+        <Checkbox
+          label="Block Checkout During Manual Review"
           checked={manualReview.blockCheckout ?? false}
-          onChange={(checked) =>
-            updateDraft({ manualReview: { ...manualReview, blockCheckout: checked } })
+          onChange={(e) =>
+            updateDraft({ manualReview: { ...manualReview, blockCheckout: e.target.checked } })
           }
         />
       </FormGroup>
