@@ -17,6 +17,7 @@ import {
 import {
   getTemplateIntegrationConfig,
   loginToAdhocApi,
+  refreshAdhocToken,
   updateTemplateIntegrationConfig,
 } from '../../../core/verify-api.js';
 import type { AdHocAdminConfig, IntegrationConfig, FaceMatchScore } from '../../../core/types.js';
@@ -27,6 +28,7 @@ interface Props {
 
 const SESSION_TOKEN_KEY = 'ahv_bearer';
 const SESSION_EXPIRY_KEY = 'ahv_bearer_exp';
+const SESSION_REFRESH_KEY = 'ahv_bearer_refresh';
 const LOCAL_KEY_KEY = 'ahv_integration_key';
 const LOCAL_TEMPLATE_KEY = 'ahv_template_id';
 
@@ -43,16 +45,37 @@ const PAGE_OPTIONS: Array<{ value: 'cart' | 'checkout' | 'order-confirmation'; l
   { value: 'order-confirmation', label: 'Order Confirmation' },
 ];
 
-function getValidToken(): string | null {
+function storeAuthResult(result: { access_token: string; refresh_token?: string; expires_in: number }) {
+  sessionStorage.setItem(SESSION_TOKEN_KEY, result.access_token);
+  sessionStorage.setItem(SESSION_EXPIRY_KEY, String(Date.now() + result.expires_in * 1000));
+  if (result.refresh_token) {
+    sessionStorage.setItem(SESSION_REFRESH_KEY, result.refresh_token);
+  }
+}
+
+function clearAuthTokens() {
+  sessionStorage.removeItem(SESSION_TOKEN_KEY);
+  sessionStorage.removeItem(SESSION_EXPIRY_KEY);
+  sessionStorage.removeItem(SESSION_REFRESH_KEY);
+}
+
+async function getOrRefreshToken(apiBase: string): Promise<string | null> {
   const token = sessionStorage.getItem(SESSION_TOKEN_KEY);
   const expiry = sessionStorage.getItem(SESSION_EXPIRY_KEY);
-  if (!token || !expiry) return null;
-  if (Date.now() >= parseInt(expiry, 10)) {
-    sessionStorage.removeItem(SESSION_TOKEN_KEY);
-    sessionStorage.removeItem(SESSION_EXPIRY_KEY);
-    return null;
+  if (token && expiry && Date.now() < parseInt(expiry, 10)) return token;
+
+  // Token missing or expired — try refresh
+  const refreshToken = sessionStorage.getItem(SESSION_REFRESH_KEY);
+  if (refreshToken) {
+    const refreshed = await refreshAdhocToken(apiBase, refreshToken);
+    if (refreshed) {
+      storeAuthResult(refreshed);
+      return refreshed.access_token;
+    }
   }
-  return token;
+
+  clearAuthTokens();
+  return null;
 }
 
 export default function IntegrationConfigPage({ config }: Props) {
@@ -104,15 +127,23 @@ export default function IntegrationConfigPage({ config }: Props) {
 
     const remote = await getTemplateIntegrationConfig(config.apiBase, key, tid);
     if (!remote) {
-      setLoadError('Failed to load config. Check that the Integration Key and Template ID are correct.');
+      setLoadError('Network error. Check your connection and try again.');
+    } else if (!remote.ok) {
+      if (remote.status === 401) {
+        setLoadError(`Integration Key is invalid or revoked. Verify the key in your Ad-Hoc Verify account. (${remote.error})`);
+      } else if (remote.status === 404) {
+        setLoadError('Template not found. Check that the Template ID is correct.');
+      } else {
+        setLoadError(`Failed to load config (HTTP ${remote.status}): ${remote.error}`);
+      }
     } else {
-      setConfigData(remote);
+      setConfigData(remote.data);
     }
     setLoadingConfig(false);
   }
 
-  function handleEditClick() {
-    const token = getValidToken();
+  async function handleEditClick() {
+    const token = await getOrRefreshToken(config.apiBase);
     if (token) {
       setDraft({ ...configData });
       setSaveError(null);
@@ -137,11 +168,7 @@ export default function IntegrationConfigPage({ config }: Props) {
       return;
     }
 
-    sessionStorage.setItem(SESSION_TOKEN_KEY, result.access_token);
-    sessionStorage.setItem(
-      SESSION_EXPIRY_KEY,
-      String(Date.now() + result.expires_in * 1000),
-    );
+    storeAuthResult(result);
 
     setLoggingIn(false);
     setShowLoginModal(false);
@@ -151,7 +178,7 @@ export default function IntegrationConfigPage({ config }: Props) {
   }
 
   async function handleSave() {
-    const token = getValidToken();
+    const token = await getOrRefreshToken(config.apiBase);
     if (!token) {
       setLoginEmail('');
       setLoginPassword('');
@@ -178,8 +205,7 @@ export default function IntegrationConfigPage({ config }: Props) {
       }
     } catch (err) {
       if (err instanceof Error && err.message === 'unauthorized') {
-        sessionStorage.removeItem(SESSION_TOKEN_KEY);
-        sessionStorage.removeItem(SESSION_EXPIRY_KEY);
+        clearAuthTokens();
         setIsEditing(false);
         setLoginEmail('');
         setLoginPassword('');
@@ -248,7 +274,7 @@ export default function IntegrationConfigPage({ config }: Props) {
         <Panel header="Integration Config">
           <ReadOnlyConfig configData={configData} />
           <div style={{ marginTop: '24px' }}>
-            <Button variant="secondary" onClick={handleEditClick}>
+            <Button variant="secondary" onClick={() => void handleEditClick()}>
               Edit
             </Button>
             <Text as="span" marginLeft="small" color="secondary50">

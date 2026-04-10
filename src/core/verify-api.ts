@@ -90,19 +90,34 @@ export async function bcMetafieldsProxy<T>(
 
 // ─── Template integration_config ─────────────────────────────────────────────
 
+export type TemplateConfigResult =
+  | { ok: true; data: IntegrationConfig }
+  | { ok: false; status: number; error: string };
+
 export async function getTemplateIntegrationConfig(
   apiBase: string,
   integrationKey: string,
   templateId: string,
-): Promise<IntegrationConfig | null> {
-  return safeFetch<IntegrationConfig>(
-    `${apiBase}/get-template-config?template_id=${encodeURIComponent(templateId)}`,
-    { headers: { 'X-API-Key': integrationKey } },
-  );
+): Promise<TemplateConfigResult | null> {
+  try {
+    const r = await fetch(
+      `${apiBase}/get-template-config?template_id=${encodeURIComponent(templateId)}`,
+      { headers: { 'X-API-Key': integrationKey } },
+    );
+    if (r.ok) {
+      const data = (await r.json()) as IntegrationConfig;
+      return { ok: true, data };
+    }
+    const body = (await r.json().catch(() => ({}))) as { error?: string };
+    return { ok: false, status: r.status, error: body.error ?? `Request failed (${r.status})` };
+  } catch (_) {
+    return null;
+  }
 }
 
 export interface AdhocAuthResponse {
   access_token: string;
+  refresh_token?: string;
   expires_in: number;
 }
 
@@ -115,6 +130,17 @@ export async function loginToAdhocApi(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
+  });
+}
+
+export async function refreshAdhocToken(
+  apiBase: string,
+  refreshToken: string,
+): Promise<AdhocAuthResponse | null> {
+  return safeFetch<AdhocAuthResponse>(`${apiBase}/api/auth/refresh`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refresh_token: refreshToken }),
   });
 }
 
