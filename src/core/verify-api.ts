@@ -105,7 +105,8 @@ export async function getTemplateIntegrationConfig(
       { headers: { 'X-API-Key': integrationKey } },
     );
     if (r.ok) {
-      const data = (await r.json()) as IntegrationConfig;
+      const raw = (await r.json()) as IntegrationConfig & { integration_config?: IntegrationConfig };
+      const data = raw.integration_config ?? raw;
       return { ok: true, data };
     }
     const body = (await r.json().catch(() => ({}))) as { error?: string };
