@@ -145,6 +145,19 @@ export async function refreshAdhocToken(
   });
 }
 
+function sanitizeIntegrationConfig(raw: IntegrationConfig): IntegrationConfig {
+  const { storeHash, storeAccessToken, pages, ruleset, manualReview, buttonText, selector } = raw;
+  const out: IntegrationConfig = {};
+  if (storeHash !== undefined) out.storeHash = storeHash;
+  if (storeAccessToken !== undefined) out.storeAccessToken = storeAccessToken;
+  if (pages !== undefined) out.pages = pages;
+  if (ruleset !== undefined) out.ruleset = ruleset;
+  if (manualReview !== undefined) out.manualReview = manualReview;
+  if (buttonText !== undefined) out.buttonText = buttonText;
+  if (selector !== undefined) out.selector = selector;
+  return out;
+}
+
 export async function updateTemplateIntegrationConfig(
   apiBase: string,
   bearerToken: string,
@@ -158,7 +171,7 @@ export async function updateTemplateIntegrationConfig(
         'Content-Type': 'application/json',
         Authorization: `Bearer ${bearerToken}`,
       },
-      body: JSON.stringify({ integration_config: config }),
+      body: JSON.stringify({ integration_config: sanitizeIntegrationConfig(config) }),
     });
     if (r.status === 401) throw new Error('unauthorized');
     return r.ok;
