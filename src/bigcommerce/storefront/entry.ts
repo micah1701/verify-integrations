@@ -581,11 +581,13 @@ async function bootstrap(): Promise<void> {
       config.integrationKey,
       userConfig.templateId,
     );
-    if (remote) {
-      log('Remote integration_config received:', remote);
-      await applyRemoteConfig(remote);
-    } else {
+    if (remote === null) {
       log('Remote integration_config fetch returned null — using local config only.');
+    } else if (!remote.ok) {
+      log(`Remote integration_config fetch failed (${remote.status}): ${remote.error} — using local config only.`);
+    } else {
+      log('Remote integration_config received:', remote.data);
+      await applyRemoteConfig(remote.data);
     }
   } else {
     log('No templateId configured — skipping remote config fetch, using local config only.');
