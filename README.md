@@ -257,7 +257,6 @@ Open the BC admin panel → **Apps → Ad-Hoc Verify → Integration Config** ta
 3. Fill in your store details:
    - **Store Hash** — the short alphanumeric code from your BC store URL
    - **Store Access Token** — from a BC store-level API account (**Settings → Store-level API accounts**; required scopes: **Carts** read/write, **Customers** read/write)
-   - **Pages** — which pages to show the verification UI on (`cart`, `checkout`, `order-confirmation`)
    - **Ruleset** — verification pass/fail thresholds
 4. Click **Save**
 
@@ -310,7 +309,7 @@ The recommended approach is to keep the script tag minimal and manage all store-
 | `templateId` | `string` | Recommended | Template UUID — all other config is fetched from this template's `integration_config` |
 | `storeHash` | `string` | From template | BC store hash — set via Integration Config tab, not the script tag |
 | `storeAccessToken` | `string` | From template | BC store-level API access token — set via Integration Config tab |
-| `pages` | `string[]` | From template | Pages to activate: `'cart'`, `'checkout'`, `'order-confirmation'` |
+| `pages` | `string[]` | `['cart', 'checkout']` | Pages to activate: `'cart'`, `'checkout'`, `'order-confirmation'`. **Must be set here in the script tag** — the plugin evaluates this synchronously at load time, before any remote config is fetched, so values stored in the template have no effect. |
 | `ruleset.requireVerification` | `boolean` | `true` | Disable checkout until verified |
 | `ruleset.minFaceMatchScore` | `string\|null` | `null` | Minimum face match tier: `'definite_match'`, `'likely_match'`, `'possible_match'` |
 | `ruleset.requireOver18` | `boolean` | `false` | Fail if `over_18` is false |

@@ -356,7 +356,6 @@ function ReadOnlyConfig({ configData }: { configData: IntegrationConfig }) {
   const rows: Array<{ label: string; value: string }> = [
     { label: 'Store Hash', value: configData.storeHash ?? '—' },
     { label: 'Store Access Token', value: configData.storeAccessToken ? '••••••••' : '—' },
-    { label: 'Pages', value: configData.pages?.join(', ') || '—' },
     { label: 'Require Verification', value: configData.ruleset?.requireVerification ? 'Yes' : 'No' },
     { label: 'Min Face Match Score', value: configData.ruleset?.minFaceMatchScore ?? 'Any' },
     { label: 'Require Over 18', value: configData.ruleset?.requireOver18 ? 'Yes' : 'No' },
