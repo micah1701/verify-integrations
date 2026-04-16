@@ -314,6 +314,38 @@ async function init(): Promise<void> {
   _cartMfId = resolved.cartMfId ?? undefined;
   _customerMfId = resolved.customerMfId ?? undefined;
 
+  // Returning verified customer: their customer metafield carries a verified status from a prior
+  // session/device. Write that verification to the cart metafield now so cart and order records
+  // are linked. Also seed COMPLETED_KEY so the order confirmation page writes the order metafield.
+  if (
+    resolved.state === 'verified' &&
+    resolved.source === 'customer' &&
+    customerMf &&
+    config.storeHash &&
+    config.storeAccessToken
+  ) {
+    const { verificationId, verification, status } = customerMf.value;
+    try {
+      await saveCartMetafield(
+        config.apiBase,
+        config.storeHash,
+        config.storeAccessToken,
+        _cartId,
+        verificationId,
+        verification,
+        _cartMfId,
+        status,
+      );
+      await invalidateMetafieldCache(_cartId, _customerId);
+      if (!sessionStorage.getItem(COMPLETED_KEY)) {
+        sessionStorage.setItem(
+          COMPLETED_KEY,
+          JSON.stringify({ verificationId, result: verification, status }),
+        );
+      }
+    } catch (_) {}
+  }
+
   // Backfill: if now logged in but no customer metafield, check for a completed verification
   // from earlier in this session (e.g. verified as guest, then created an account).
   if (_customerId !== 0 && !customerMf && config.storeHash && config.storeAccessToken) {
