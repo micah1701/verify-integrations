@@ -83,6 +83,8 @@ export interface AdHocVerifyConfig {
   pages: string[];
   ruleset: Ruleset;
   manualReview?: Partial<ManualReviewConfig>;
+  /** Set to true to enable verbose debug logging to the browser console. */
+  logging?: boolean;
   onComplete?: (id: string) => void;
   onResult?: (result: VerificationResultCallback) => void;
 }

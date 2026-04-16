@@ -2,6 +2,8 @@
 // Handles SPA re-renders via MutationObserver so the block persists through
 // React/Angular hydration on BC's checkout page.
 
+import { log } from './logger.js';
+
 const CONTAINER_ID = 'adhoc-verify-container';
 const WARNING_ID = 'adhoc-checkout-warning';
 const BLOCKED_ATTR = 'data-adhoc-blocked';
@@ -19,15 +21,23 @@ function findCheckoutButton(): HTMLButtonElement | null {
 
 function applyCheckoutButtonBlock(): void {
   const btn = findCheckoutButton();
-  if (!btn) return;
-  if (btn.getAttribute(BLOCKED_ATTR) === 'true') return;
+  if (!btn) {
+    log('applyCheckoutButtonBlock: checkout button not found in DOM yet — will retry via MutationObserver.');
+    return;
+  }
+  if (btn.getAttribute(BLOCKED_ATTR) === 'true') {
+    log('applyCheckoutButtonBlock: button already blocked — no action needed.');
+    return;
+  }
   btn.setAttribute(ORIGINAL_DISABLED_ATTR, btn.disabled ? 'true' : 'false');
   btn.setAttribute(BLOCKED_ATTR, 'true');
   btn.disabled = true;
   btn.title = 'Identity verification required';
+  log('applyCheckoutButtonBlock: checkout button disabled.');
 }
 
 export function renderCheckoutBlock(): void {
+  log('renderCheckoutBlock: installing verification-required warning and disabling checkout button.');
   // Insert warning banner once
   if (!document.getElementById(WARNING_ID)) {
     const banner = document.createElement('div');
@@ -39,7 +49,12 @@ export function renderCheckoutBlock(): void {
     const container = document.getElementById(CONTAINER_ID);
     if (container?.parentNode) {
       container.parentNode.insertBefore(banner, container.nextSibling);
+      log('renderCheckoutBlock: warning banner inserted into DOM.');
+    } else {
+      log('renderCheckoutBlock: container not found — warning banner could not be inserted.');
     }
+  } else {
+    log('renderCheckoutBlock: warning banner already present — skipping insert.');
   }
 
   applyCheckoutButtonBlock();
@@ -48,14 +63,19 @@ export function renderCheckoutBlock(): void {
   if (!observer) {
     observer = new MutationObserver(() => applyCheckoutButtonBlock());
     observer.observe(document.body, { childList: true, subtree: true });
+    log('renderCheckoutBlock: MutationObserver started to persist checkout block across SPA re-renders.');
   }
 }
 
 export function removeCheckoutBlock(): void {
+  log('removeCheckoutBlock: removing checkout block and re-enabling checkout button.');
   disconnectObserver();
 
   const warning = document.getElementById(WARNING_ID);
-  warning?.parentNode?.removeChild(warning);
+  if (warning) {
+    warning.parentNode?.removeChild(warning);
+    log('removeCheckoutBlock: warning banner removed from DOM.');
+  }
 
   const btn = findCheckoutButton();
   if (btn && btn.getAttribute(BLOCKED_ATTR) === 'true') {
@@ -63,10 +83,16 @@ export function removeCheckoutBlock(): void {
     btn.removeAttribute(ORIGINAL_DISABLED_ATTR);
     btn.removeAttribute(BLOCKED_ATTR);
     btn.title = '';
+    log('removeCheckoutBlock: checkout button re-enabled.');
+  } else {
+    log('removeCheckoutBlock: checkout button was not blocked — nothing to re-enable.');
   }
 }
 
 export function disconnectObserver(): void {
-  observer?.disconnect();
-  observer = null;
+  if (observer) {
+    observer.disconnect();
+    observer = null;
+    log('disconnectObserver: MutationObserver stopped.');
+  }
 }
