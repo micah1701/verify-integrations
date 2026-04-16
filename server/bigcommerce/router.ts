@@ -4,6 +4,12 @@ import path from 'path';
 import { handleAuth } from './auth';
 import { handleLoad } from './load';
 import { handleUninstall } from './uninstall';
+import {
+  handleCustomersList,
+  handleCustomerDetail,
+  handleOrdersList,
+  handleOrderDetail,
+} from './proxy';
 
 export const bigcommerceRouter = Router();
 
@@ -11,6 +17,12 @@ export const bigcommerceRouter = Router();
 bigcommerceRouter.get('/auth', handleAuth);
 bigcommerceRouter.get('/load', handleLoad);
 bigcommerceRouter.get('/uninstall', handleUninstall);
+
+// BC Management API proxy routes (storeHash in query string; access token stays server-side)
+bigcommerceRouter.get('/api/customers', handleCustomersList);
+bigcommerceRouter.get('/api/customers/:id', handleCustomerDetail);
+bigcommerceRouter.get('/api/orders', handleOrdersList);
+bigcommerceRouter.get('/api/orders/:id', handleOrderDetail);
 
 // Redirect bare /admin path to trailing-slash version so relative asset paths resolve correctly
 bigcommerceRouter.get('/admin', (_req, res) => {

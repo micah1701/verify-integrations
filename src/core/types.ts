@@ -124,3 +124,86 @@ export interface BCRawMetafield {
   value: string;
   permission_set: string;
 }
+
+// ─── BC Entity Shapes (BC Management API) ─────────────────────────────────────
+
+export interface BCCustomer {
+  id: number;
+  first_name: string;
+  last_name: string;
+  email: string;
+  date_created: string;    // ISO 8601
+  date_modified: string;
+  company: string;
+  phone: string;
+  address_count: number;
+  order_count: number;
+  customer_group_id: number;
+}
+
+export interface BCOrder {
+  id: number;
+  customer_id: number;     // 0 for guests
+  billing_address: {
+    first_name: string;
+    last_name: string;
+    email: string;
+    company: string;
+  };
+  status: string;
+  status_id: number;
+  total_inc_tax: string;   // string decimal, e.g. "123.45"
+  currency_code: string;
+  date_created: string;    // RFC 2822 from v2 API
+  date_modified: string;
+  items_total: number;
+}
+
+// ─── Enriched Response Types (proxy returns these, verification already resolved) ─
+
+export interface EnrichedCustomer {
+  customer: BCCustomer;
+  metafield: MetafieldValue | null;
+  verificationState: VerificationState;
+}
+
+export interface EnrichedOrder {
+  order: BCOrder;
+  metafield: MetafieldValue | null;
+  verificationState: VerificationState;
+  metafieldSource: 'order' | 'customer' | 'none';
+}
+
+export interface BCListMeta {
+  pagination: {
+    total: number;
+    count: number;
+    per_page: number;
+    current_page: number;
+    total_pages: number;
+  };
+}
+
+export interface EnrichedCustomersResponse {
+  data: EnrichedCustomer[];
+  meta: BCListMeta;
+}
+
+export interface EnrichedOrdersResponse {
+  data: EnrichedOrder[];
+  meta: BCListMeta;
+}
+
+export interface CustomerDetailResponse {
+  customer: BCCustomer;
+  metafield: MetafieldValue | null;
+  verificationState: VerificationState;
+}
+
+export interface OrderDetailResponse {
+  order: BCOrder;
+  metafield: MetafieldValue | null;
+  verificationState: VerificationState;
+  metafieldSource: 'order' | 'customer' | 'none';
+  linkedCustomer: BCCustomer | null;
+}

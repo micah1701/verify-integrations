@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { GlobalStyles, Tabs } from '@bigcommerce/big-design';
 import { theme } from '@bigcommerce/big-design-theme';
 import { ThemeProvider } from 'styled-components';
-import CustomerVerificationPage from './pages/CustomerVerificationPage.js';
-import OrderVerificationPage from './pages/OrderVerificationPage.js';
+import CustomersPage from './pages/CustomersPage.js';
+import OrdersPage from './pages/OrdersPage.js';
 import IntegrationConfigPage from './pages/IntegrationConfigPage.js';
 import type { AdHocAdminConfig } from '../../core/types.js';
 
@@ -16,16 +16,16 @@ const adminConfig = (
   storeAccessToken: '',
 };
 
-type TabId = 'customer' | 'order' | 'integration-config';
+type TabId = 'customers' | 'orders' | 'integration-config';
 
 const TABS = [
-  { id: 'customer' as TabId, title: 'Customer Verification' },
-  { id: 'order' as TabId, title: 'Order Verification' },
+  { id: 'customers' as TabId, title: 'Customers' },
+  { id: 'orders' as TabId, title: 'Orders' },
   { id: 'integration-config' as TabId, title: 'Integration Config' },
 ];
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<TabId>('customer');
+  const [activeTab, setActiveTab] = useState<TabId>('customers');
 
   return (
     <ThemeProvider theme={theme}>
@@ -37,8 +37,8 @@ export default function App() {
           onTabClick={(tabId) => setActiveTab(tabId as TabId)}
         />
         <div style={{ marginTop: '24px' }}>
-          {activeTab === 'customer' && <CustomerVerificationPage config={adminConfig} />}
-          {activeTab === 'order' && <OrderVerificationPage config={adminConfig} />}
+          {activeTab === 'customers' && <CustomersPage config={adminConfig} />}
+          {activeTab === 'orders' && <OrdersPage config={adminConfig} />}
           {activeTab === 'integration-config' && <IntegrationConfigPage config={adminConfig} />}
         </div>
       </div>
