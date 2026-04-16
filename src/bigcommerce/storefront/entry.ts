@@ -49,7 +49,7 @@ const defaults: Omit<AdHocVerifyConfig, 'integrationKey'> = {
   verifyBase: 'https://verify.ad-hoc.app',
   buttonText: 'Verify ID',
   selector: '.cart-actions',
-  pages: ['cart'],
+  pages: ['cart', 'checkout'],
   ruleset: {
     requireVerification: true,
     minFaceMatchScore: null,
@@ -561,11 +561,16 @@ function destroyModal(modal: InstanceType<typeof VerifyModal>): void {
 // If a templateId is provided, fetch integration_config from the API and apply
 // remote values for any fields the merchant did not explicitly set in the script tag.
 // window.AdHocVerifyConfig always wins; remote config fills in everything else.
+//
+// NOTE: `pages` is intentionally NOT applied from remote config. The page guard
+// (`configPages`) is evaluated synchronously at script load time — before this
+// async fetch completes — so any remote value would arrive too late to have effect.
+// Pages must be set in window.AdHocVerifyConfig in the script tag, or left as the
+// default (['cart', 'checkout']).
 async function applyRemoteConfig(remote: IntegrationConfig): Promise<void> {
   log('Applying remote integration_config (local window.AdHocVerifyConfig values take precedence):');
   if (!userConfig.storeHash && remote.storeHash) { config.storeHash = remote.storeHash; log(`  storeHash ← remote ("${remote.storeHash}")`); }
   if (!userConfig.storeAccessToken && remote.storeAccessToken) { config.storeAccessToken = remote.storeAccessToken; log('  storeAccessToken ← remote (value hidden)'); }
-  if (!userConfig.pages && remote.pages) { config.pages = remote.pages; log(`  pages ← remote ([${remote.pages.join(', ')}])`); }
   if (!userConfig.ruleset && remote.ruleset) { config.ruleset = { ...defaults.ruleset, ...remote.ruleset }; log('  ruleset ← remote', config.ruleset); }
   if (!userConfig.manualReview && remote.manualReview) { config.manualReview = { ...defaults.manualReview, ...remote.manualReview }; log('  manualReview ← remote', config.manualReview); }
   if (!userConfig.buttonText && remote.buttonText) { config.buttonText = remote.buttonText; log(`  buttonText ← remote ("${remote.buttonText}")`); }

@@ -39,12 +39,6 @@ const FACE_MATCH_OPTIONS: Array<{ value: FaceMatchScore | ''; label: string }> =
   { value: 'definite_match', label: 'Definite match' },
 ];
 
-const PAGE_OPTIONS: Array<{ value: 'cart' | 'checkout' | 'order-confirmation'; label: string }> = [
-  { value: 'cart', label: 'Cart' },
-  { value: 'checkout', label: 'Checkout' },
-  { value: 'order-confirmation', label: 'Order Confirmation' },
-];
-
 function storeAuthResult(result: { access_token: string; refresh_token?: string; expires_in: number }) {
   sessionStorage.setItem(SESSION_TOKEN_KEY, result.access_token);
   sessionStorage.setItem(SESSION_EXPIRY_KEY, String(Date.now() + result.expires_in * 1000));
@@ -223,15 +217,6 @@ export default function IntegrationConfigPage({ config }: Props) {
     setDraft((prev) => ({ ...prev, ...patch }));
   }
 
-  function togglePage(page: 'cart' | 'checkout' | 'order-confirmation') {
-    const pages = draft.pages ?? [];
-    if (pages.includes(page)) {
-      updateDraft({ pages: pages.filter((p) => p !== page) });
-    } else {
-      updateDraft({ pages: [...pages, page] });
-    }
-  }
-
   return (
     <>
       {/* ── Setup ─────────────────────────────────────────────────────────── */}
@@ -289,7 +274,6 @@ export default function IntegrationConfigPage({ config }: Props) {
           <EditForm
             draft={draft}
             updateDraft={updateDraft}
-            togglePage={togglePage}
           />
           {saveError && (
             <InlineMessage type="error" messages={[{ text: saveError }]} marginVertical="medium" />
@@ -400,11 +384,9 @@ function ReadOnlyConfig({ configData }: { configData: IntegrationConfig }) {
 function EditForm({
   draft,
   updateDraft,
-  togglePage,
 }: {
   draft: IntegrationConfig;
   updateDraft: (patch: Partial<IntegrationConfig>) => void;
-  togglePage: (page: 'cart' | 'checkout' | 'order-confirmation') => void;
 }) {
   const ruleset = draft.ruleset ?? {
     requireVerification: true,
@@ -434,21 +416,6 @@ function EditForm({
           onChange={(e) => updateDraft({ storeAccessToken: e.target.value })}
           placeholder="BC OAuth access token"
         />
-      </FormGroup>
-
-      <HR />
-
-      {/* Pages */}
-      <FormGroup>
-        <FormControlLabel>Active Pages</FormControlLabel>
-        {PAGE_OPTIONS.map(({ value, label }) => (
-          <Checkbox
-            key={value}
-            label={label}
-            checked={draft.pages?.includes(value) ?? false}
-            onChange={() => togglePage(value)}
-          />
-        ))}
       </FormGroup>
 
       <HR />
