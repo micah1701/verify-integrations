@@ -33,10 +33,10 @@ import {
   saveOrderMetafield,
   invalidateMetafieldCache,
 } from './bc-adapter.js';
-import { renderCheckoutBlock, removeCheckoutBlock } from './checkout-block.js';
+import { renderCheckoutBlock, removeCheckoutBlock, renderCheckoutWarn } from './checkout-block.js';
 import { resolveOverallState } from '../../core/verification-state.js';
 import { createVerification, getTemplateIntegrationConfig } from '../../core/verify-api.js';
-import type { AdHocVerifyConfig, IntegrationConfig, VerificationOutcome, VerificationState, VerificationStatus } from '../../core/types.js';
+import type { AdHocVerifyConfig, CheckoutEnforcement, IntegrationConfig, VerificationOutcome, VerificationState, VerificationStatus, VerifyTriggerRule } from '../../core/types.js';
 import { log, setLogging } from './logger.js';
 
 // Injected at build time via Vite define
@@ -61,7 +61,32 @@ const defaults: Omit<AdHocVerifyConfig, 'integrationKey'> = {
     message:
       'Your verification is pending a manual review. You may continue to place your order, but there may be a delay in processing while we confirm your verification.',
   },
+  triggerRule: { mode: 'always' },
 };
+
+const DEFAULT_WARN_MESSAGE =
+  'Your order may incur shipping delays or be cancelled until your identity can be verified.';
+
+/** Returns true if the widget should be shown given the cart's product IDs and the configured trigger rule. */
+function evaluateTriggerRule(productIds: number[], rule?: VerifyTriggerRule): boolean {
+  if (!rule || rule.mode === 'always') return true;
+  if (rule.mode === 'exclude_products') {
+    const excluded = rule.productIds ?? [];
+    return excluded.length === 0 || !productIds.some((id) => excluded.includes(id));
+  }
+  // only_products
+  const required = rule.productIds ?? [];
+  return required.length > 0 && productIds.some((id) => required.includes(id));
+}
+
+/** Resolves the effective checkout enforcement mode, falling back to requireVerification for backward compat. */
+function getEffectiveEnforcement(cfg: AdHocVerifyConfig): 'block' | 'warn' | 'none' {
+  const mode = cfg.checkoutEnforcement?.mode;
+  if (mode === 'warn') return 'warn';
+  if (mode === 'block') return 'block';
+  if (mode === 'none') return 'none';
+  return cfg.ruleset.requireVerification ? 'block' : 'none';
+}
 
 const userConfig = (window as Window & { AdHocVerifyConfig?: Partial<AdHocVerifyConfig> })
   .AdHocVerifyConfig ?? {};
@@ -328,7 +353,14 @@ async function init(): Promise<void> {
 
   _cartId = cart.cartId;
   _customerId = cart.customerId;
-  log(`Cart loaded: cartId="${_cartId}", customerId=${_customerId}, loggedIn=${_customerId !== 0}`);
+  log(`Cart loaded: cartId="${_cartId}", customerId=${_customerId}, loggedIn=${_customerId !== 0}, productIds=[${(cart.productIds ?? []).join(', ')}]`);
+
+  // Trigger rule: hide the widget entirely if this cart doesn't qualify
+  if (!evaluateTriggerRule(cart.productIds ?? [], config.triggerRule)) {
+    log(`Trigger rule (mode="${config.triggerRule?.mode}"): cart products do not match — widget hidden.`);
+    return;
+  }
+  log(`Trigger rule (mode="${config.triggerRule?.mode}"): cart products match — proceeding.`);
 
   if (!config.storeHash || !config.storeAccessToken) {
     log('storeHash or storeAccessToken not configured — skipping metafield fetch. Will show unverified state.');
@@ -444,9 +476,16 @@ async function init(): Promise<void> {
             log('Backfill: pending_review + blockCheckout=true — rendering checkout block.');
             renderCheckoutBlock();
           }
-        } else if (reresolved.state !== 'verified' && isCheckout && config.ruleset.requireVerification) {
-          log(`Backfill: state="${reresolved.state}" + requireVerification=true — rendering checkout block.`);
-          renderCheckoutBlock();
+        } else if (reresolved.state !== 'verified' && isCheckout) {
+          const enforcement = getEffectiveEnforcement(config);
+          if (enforcement === 'block') {
+            log(`Backfill: state="${reresolved.state}" + enforcement=block — rendering checkout block.`);
+            renderCheckoutBlock();
+          } else if (enforcement === 'warn') {
+            const msg = config.checkoutEnforcement?.warningMessage || DEFAULT_WARN_MESSAGE;
+            log(`Backfill: state="${reresolved.state}" + enforcement=warn — showing warning banner.`);
+            renderCheckoutWarn(msg);
+          }
         }
         return;
       } catch (_) {
@@ -467,9 +506,18 @@ async function init(): Promise<void> {
     } else {
       log('State is pending_review + blockCheckout=false — checkout allowed.');
     }
-  } else if (resolved.state !== 'verified' && isCheckout && config.ruleset.requireVerification) {
-    log(`State is "${resolved.state}" + requireVerification=true — rendering checkout block.`);
-    renderCheckoutBlock();
+  } else if (resolved.state !== 'verified' && isCheckout) {
+    const enforcement = getEffectiveEnforcement(config);
+    if (enforcement === 'block') {
+      log(`State is "${resolved.state}" + enforcement=block — rendering checkout block.`);
+      renderCheckoutBlock();
+    } else if (enforcement === 'warn') {
+      const msg = config.checkoutEnforcement?.warningMessage || DEFAULT_WARN_MESSAGE;
+      log(`State is "${resolved.state}" + enforcement=warn — showing warning banner.`);
+      renderCheckoutWarn(msg);
+    } else {
+      log(`State is "${resolved.state}" + enforcement=none — no checkout action.`);
+    }
   } else if (resolved.state === 'verified') {
     log('Customer is verified — checkout block not required.');
   }
@@ -573,6 +621,8 @@ async function applyRemoteConfig(remote: IntegrationConfig): Promise<void> {
   if (!userConfig.storeAccessToken && remote.storeAccessToken) { config.storeAccessToken = remote.storeAccessToken; log('  storeAccessToken ← remote (value hidden)'); }
   if (!userConfig.ruleset && remote.ruleset) { config.ruleset = { ...defaults.ruleset, ...remote.ruleset }; log('  ruleset ← remote', config.ruleset); }
   if (!userConfig.manualReview && remote.manualReview) { config.manualReview = { ...defaults.manualReview, ...remote.manualReview }; log('  manualReview ← remote', config.manualReview); }
+  if (!userConfig.triggerRule && remote.triggerRule) { config.triggerRule = remote.triggerRule; log('  triggerRule ← remote', config.triggerRule); }
+  if (!userConfig.checkoutEnforcement && remote.checkoutEnforcement) { config.checkoutEnforcement = remote.checkoutEnforcement; log('  checkoutEnforcement ← remote', config.checkoutEnforcement); }
   if (!userConfig.buttonText && remote.buttonText) { config.buttonText = remote.buttonText; log(`  buttonText ← remote ("${remote.buttonText}")`); }
   if (!userConfig.selector && remote.selector) { config.selector = remote.selector; log(`  selector ← remote ("${remote.selector}")`); }
   log('Remote config applied. Final config:', config);

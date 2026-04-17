@@ -67,6 +67,32 @@ export function renderCheckoutBlock(): void {
   }
 }
 
+/**
+ * Shows a soft warning banner near the checkout button without disabling it.
+ * Used when checkoutEnforcement.mode = 'warn' — the customer can still proceed
+ * but is informed their order may be affected.
+ */
+export function renderCheckoutWarn(message: string): void {
+  log('renderCheckoutWarn: inserting soft warning banner (checkout button remains enabled).');
+  if (document.getElementById(WARNING_ID)) {
+    log('renderCheckoutWarn: warning banner already present — skipping insert.');
+    return;
+  }
+  const banner = document.createElement('div');
+  banner.id = WARNING_ID;
+  banner.style.cssText =
+    'padding:10px 15px;margin:10px 0;background:#fff3cd;border:1px solid #ffc107;' +
+    'border-radius:4px;font-size:14px;color:#856404;';
+  banner.textContent = message;
+  const container = document.getElementById(CONTAINER_ID);
+  if (container?.parentNode) {
+    container.parentNode.insertBefore(banner, container.nextSibling);
+    log('renderCheckoutWarn: warning banner inserted into DOM.');
+  } else {
+    log('renderCheckoutWarn: container not found — warning banner could not be inserted.');
+  }
+}
+
 export function removeCheckoutBlock(): void {
   log('removeCheckoutBlock: removing checkout block and re-enabling checkout button.');
   disconnectObserver();

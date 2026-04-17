@@ -12,6 +12,7 @@ const TTL_MF   = 5 * 60 * 1000;   // 5 min
 export interface CartInfo {
   cartId: string;
   customerId: number;
+  productIds: number[];
 }
 
 export async function loadCart(): Promise<CartInfo | null> {
@@ -35,9 +36,19 @@ export async function loadCart(): Promise<CartInfo | null> {
       log('loadCart: no active cart found (empty response) — returning null.');
       return null;
     }
-    const cart = data[0] as { id: string; customerId?: number };
-    const result: CartInfo = { cartId: cart.id, customerId: cart.customerId ?? 0 };
-    log(`loadCart: cartId="${result.cartId}", customerId=${result.customerId}, loggedIn=${result.customerId !== 0}`);
+    const cart = data[0] as {
+      id: string;
+      customerId?: number;
+      lineItems?: {
+        physicalItems?: Array<{ productId: number }>;
+        digitalItems?: Array<{ productId: number }>;
+      };
+    };
+    const physicalIds = cart.lineItems?.physicalItems?.map((i) => i.productId) ?? [];
+    const digitalIds = cart.lineItems?.digitalItems?.map((i) => i.productId) ?? [];
+    const productIds = [...new Set([...physicalIds, ...digitalIds])];
+    const result: CartInfo = { cartId: cart.id, customerId: cart.customerId ?? 0, productIds };
+    log(`loadCart: cartId="${result.cartId}", customerId=${result.customerId}, loggedIn=${result.customerId !== 0}, productIds=[${productIds.join(', ')}]`);
     await dbSet('adhoc_cart', result, TTL_CART);
     return result;
   } catch (err) {

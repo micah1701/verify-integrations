@@ -24,6 +24,34 @@ export interface Ruleset {
   requireOver21: boolean;
 }
 
+// ─── Trigger Rule (when to show the Verify ID widget) ─────────────────────────
+
+/** Controls which carts trigger the Verify ID widget. */
+export type VerifyTriggerMode =
+  | 'always'            // Show on every transaction (default)
+  | 'exclude_products'  // Show unless the cart contains one of the specified product IDs
+  | 'only_products';    // Only show if the cart contains at least one specified product ID
+
+export interface VerifyTriggerRule {
+  mode: VerifyTriggerMode;
+  /** Product IDs to exclude or require, depending on mode. Unused when mode is 'always'. */
+  productIds?: number[];
+}
+
+// ─── Checkout Enforcement (what happens at checkout when not verified) ─────────
+
+/** Controls checkout behaviour when the customer has not completed verification. */
+export type CheckoutEnforcementMode =
+  | 'block'  // Disable the checkout button until verification is complete
+  | 'warn'   // Allow checkout but show a customisable warning message
+  | 'none';  // Take no action (widget is informational only)
+
+export interface CheckoutEnforcement {
+  mode: CheckoutEnforcementMode;
+  /** Message shown when mode is 'warn'. Falsy = use the built-in default. */
+  warningMessage?: string | null;
+}
+
 // ─── Verification Result (from get-verification-result / webhook) ──────────────
 
 export interface VerificationOutcome {
@@ -83,6 +111,8 @@ export interface AdHocVerifyConfig {
   pages: string[];
   ruleset: Ruleset;
   manualReview?: Partial<ManualReviewConfig>;
+  triggerRule?: VerifyTriggerRule;
+  checkoutEnforcement?: CheckoutEnforcement;
   /** Set to true to enable verbose debug logging to the browser console. */
   logging?: boolean;
   onComplete?: (id: string) => void;
@@ -105,6 +135,8 @@ export interface IntegrationConfig {
   pages?: Array<'cart' | 'checkout' | 'order-confirmation'>;
   ruleset?: Ruleset;
   manualReview?: Partial<ManualReviewConfig>;
+  triggerRule?: VerifyTriggerRule;
+  checkoutEnforcement?: CheckoutEnforcement;
   buttonText?: string;
   selector?: string;
 }

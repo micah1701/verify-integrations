@@ -20,7 +20,15 @@ import {
   refreshAdhocToken,
   updateTemplateIntegrationConfig,
 } from '../../../core/verify-api.js';
-import type { AdHocAdminConfig, IntegrationConfig, FaceMatchScore } from '../../../core/types.js';
+import type {
+  AdHocAdminConfig,
+  CheckoutEnforcement,
+  CheckoutEnforcementMode,
+  FaceMatchScore,
+  IntegrationConfig,
+  VerifyTriggerMode,
+  VerifyTriggerRule,
+} from '../../../core/types.js';
 
 interface Props {
   config: AdHocAdminConfig;
@@ -32,12 +40,27 @@ const SESSION_REFRESH_KEY = 'ahv_bearer_refresh';
 const LOCAL_KEY_KEY = 'ahv_integration_key';
 const LOCAL_TEMPLATE_KEY = 'ahv_template_id';
 
-const FACE_MATCH_OPTIONS: Array<{ value: FaceMatchScore | ''; label: string }> = [
-  { value: '', label: 'Any (no minimum)' },
-  { value: 'possible_match', label: 'Possible match' },
-  { value: 'likely_match', label: 'Likely match' },
-  { value: 'definite_match', label: 'Definite match' },
+const FACE_MATCH_OPTIONS: Array<{ value: FaceMatchScore | ''; content: string }> = [
+  { value: '', content: 'Any (no minimum)' },
+  { value: 'possible_match', content: 'Possible match' },
+  { value: 'likely_match', content: 'Likely match' },
+  { value: 'definite_match', content: 'Definite match' },
 ];
+
+const TRIGGER_MODE_OPTIONS: Array<{ value: VerifyTriggerMode; content: string }> = [
+  { value: 'always', content: 'Every transaction' },
+  { value: 'exclude_products', content: 'Every transaction except specific products' },
+  { value: 'only_products', content: 'Only for specific products' },
+];
+
+const CHECKOUT_ENFORCEMENT_OPTIONS: Array<{ value: CheckoutEnforcementMode; content: string }> = [
+  { value: 'block', content: 'Block checkout until verified' },
+  { value: 'warn', content: 'Allow checkout with a warning message' },
+  { value: 'none', content: 'No enforcement (widget is informational only)' },
+];
+
+const DEFAULT_WARN_MESSAGE =
+  'Your order may incur shipping delays or be cancelled until your identity can be verified.';
 
 function storeAuthResult(result: { access_token: string; refresh_token?: string; expires_in: number }) {
   sessionStorage.setItem(SESSION_TOKEN_KEY, result.access_token);
@@ -350,24 +373,59 @@ export default function IntegrationConfigPage({ config }: Props) {
   );
 }
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function productIdsToString(ids?: number[]): string {
+  return (ids ?? []).join(', ');
+}
+
+function stringToProductIds(value: string): number[] {
+  return value
+    .split(/[\s,]+/)
+    .map((s) => parseInt(s, 10))
+    .filter((n) => !isNaN(n) && n > 0);
+}
+
+function triggerModeLabel(mode?: VerifyTriggerMode): string {
+  return TRIGGER_MODE_OPTIONS.find((o) => o.value === mode)?.content ?? 'Every transaction';
+}
+
+function enforcementModeLabel(mode?: CheckoutEnforcementMode): string {
+  return CHECKOUT_ENFORCEMENT_OPTIONS.find((o) => o.value === mode)?.content ?? '—';
+}
+
 // ─── Read-only display ────────────────────────────────────────────────────────
 
 function ReadOnlyConfig({ configData }: { configData: IntegrationConfig }) {
+  const triggerMode = configData.triggerRule?.mode ?? 'always';
+  const triggerProductIds = configData.triggerRule?.productIds ?? [];
+  const triggerDisplay =
+    triggerMode === 'always'
+      ? triggerModeLabel(triggerMode)
+      : `${triggerModeLabel(triggerMode)} — IDs: ${triggerProductIds.length > 0 ? triggerProductIds.join(', ') : '(none)'}`;
+
+  const enforcementMode = configData.checkoutEnforcement?.mode;
+  const warningMsg = configData.checkoutEnforcement?.warningMessage;
+  const enforcementDisplay = enforcementMode
+    ? enforcementModeLabel(enforcementMode) + (warningMsg ? ` — "${warningMsg}"` : '')
+    : '—';
+
   const rows: Array<{ label: string; value: string }> = [
     { label: 'Store Hash', value: configData.storeHash ?? '—' },
     { label: 'Store Access Token', value: configData.storeAccessToken ? '••••••••' : '—' },
-    { label: 'Require Verification', value: configData.ruleset?.requireVerification ? 'Yes' : 'No' },
+    { label: 'Show Verify ID Button', value: triggerDisplay },
+    { label: 'Checkout Behavior', value: enforcementDisplay },
     { label: 'Min Face Match Score', value: configData.ruleset?.minFaceMatchScore ?? 'Any' },
     { label: 'Require Over 18', value: configData.ruleset?.requireOver18 ? 'Yes' : 'No' },
     { label: 'Require Over 21', value: configData.ruleset?.requireOver21 ? 'Yes' : 'No' },
-    { label: 'Block Checkout on Manual Review', value: configData.manualReview?.blockCheckout ? 'Yes' : 'No' },
+    { label: 'Prevent Checkout During Manual Review', value: configData.manualReview?.blockCheckout ? 'Yes' : 'No' },
     { label: 'Manual Review Message', value: configData.manualReview?.message ? String(configData.manualReview.message) : '—' },
     { label: 'Button Text', value: configData.buttonText ?? '—' },
     { label: 'Selector', value: configData.selector ?? '—' },
   ];
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: '8px 16px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: '8px 16px' }}>
       {rows.map(({ label, value }) => (
         <React.Fragment key={label}>
           <Text bold>{label}</Text>
@@ -395,6 +453,17 @@ function EditForm({
   };
   const manualReview = draft.manualReview ?? { blockCheckout: false, message: null };
 
+  const triggerRule: VerifyTriggerRule = draft.triggerRule ?? { mode: 'always', productIds: [] };
+  const checkoutEnforcement: CheckoutEnforcement = draft.checkoutEnforcement ?? { mode: 'block', warningMessage: null };
+
+  function updateTriggerRule(patch: Partial<VerifyTriggerRule>) {
+    updateDraft({ triggerRule: { ...triggerRule, ...patch } });
+  }
+
+  function updateEnforcement(patch: Partial<CheckoutEnforcement>) {
+    updateDraft({ checkoutEnforcement: { ...checkoutEnforcement, ...patch } });
+  }
+
   return (
     <Form onSubmit={(e) => e.preventDefault()}>
       {/* Store credentials */}
@@ -419,20 +488,77 @@ function EditForm({
 
       <HR />
 
-      {/* Ruleset */}
+      {/* Trigger rule — when to show the widget */}
+      <Text bold marginBottom="small">Show Verify ID Button</Text>
+      <Text color="secondary50" marginBottom="medium">
+        Controls which transactions prompt customers to verify their identity.
+      </Text>
       <FormGroup>
-        <Checkbox
-          label="Require Verification"
-          checked={ruleset.requireVerification}
-          onChange={(e) =>
-            updateDraft({ ruleset: { ...ruleset, requireVerification: e.target.checked } })
-          }
+        <FormControlLabel htmlFor="edit-trigger-mode">When to show the button</FormControlLabel>
+        <Select
+          value={triggerRule.mode}
+          onOptionChange={(val) => updateTriggerRule({ mode: val as VerifyTriggerMode })}
+          options={TRIGGER_MODE_OPTIONS}
         />
       </FormGroup>
+      {triggerRule.mode !== 'always' && (
+        <FormGroup>
+          <FormControlLabel htmlFor="edit-trigger-products">
+            {triggerRule.mode === 'exclude_products'
+              ? 'Product IDs to exclude (comma-separated)'
+              : 'Product IDs to require (comma-separated)'}
+          </FormControlLabel>
+          <Input
+            id="edit-trigger-products"
+            value={productIdsToString(triggerRule.productIds)}
+            onChange={(e) =>
+              updateTriggerRule({ productIds: stringToProductIds(e.target.value) })
+            }
+            placeholder="e.g. 101, 202, 303"
+          />
+        </FormGroup>
+      )}
+
+      <HR />
+
+      {/* Checkout enforcement */}
+      <Text bold marginBottom="small">Checkout Behavior</Text>
+      <Text color="secondary50" marginBottom="medium">
+        What happens at checkout when the customer has not completed verification.
+      </Text>
+      <FormGroup>
+        <FormControlLabel htmlFor="edit-enforcement-mode">When not verified at checkout</FormControlLabel>
+        <Select
+          value={checkoutEnforcement.mode}
+          onOptionChange={(val) => updateEnforcement({ mode: val as CheckoutEnforcementMode })}
+          options={CHECKOUT_ENFORCEMENT_OPTIONS}
+        />
+      </FormGroup>
+      {checkoutEnforcement.mode === 'warn' && (
+        <FormGroup>
+          <FormControlLabel htmlFor="edit-warn-message">Warning Message</FormControlLabel>
+          <Textarea
+            id="edit-warn-message"
+            value={checkoutEnforcement.warningMessage ?? ''}
+            onChange={(e) =>
+              updateEnforcement({ warningMessage: e.target.value || null })
+            }
+            placeholder={DEFAULT_WARN_MESSAGE}
+            rows={3}
+          />
+        </FormGroup>
+      )}
+
+      <HR />
+
+      {/* Verification rules */}
+      <Text bold marginBottom="small">Verification Rules</Text>
+      <Text color="secondary50" marginBottom="medium">
+        Additional requirements a completed verification must satisfy to be considered valid.
+      </Text>
       <FormGroup>
         <FormControlLabel htmlFor="edit-face-match">Min Face Match Score</FormControlLabel>
         <Select
-          inputProps={{ id: 'edit-face-match' }}
           value={ruleset.minFaceMatchScore ?? ''}
           onOptionChange={(val) =>
             updateDraft({
@@ -447,7 +573,7 @@ function EditForm({
       </FormGroup>
       <FormGroup>
         <Checkbox
-          label="Require Over 18"
+          label="Require customer to be 18 or older"
           checked={ruleset.requireOver18}
           onChange={(e) =>
             updateDraft({ ruleset: { ...ruleset, requireOver18: e.target.checked } })
@@ -456,7 +582,7 @@ function EditForm({
       </FormGroup>
       <FormGroup>
         <Checkbox
-          label="Require Over 21"
+          label="Require customer to be 21 or older"
           checked={ruleset.requireOver21}
           onChange={(e) =>
             updateDraft({ ruleset: { ...ruleset, requireOver21: e.target.checked } })
@@ -467,17 +593,27 @@ function EditForm({
       <HR />
 
       {/* Manual review */}
+      <Text bold marginBottom="small">When Verification Requires Manual Review</Text>
+      <Text color="secondary50" marginBottom="medium">
+        Some submissions cannot be automatically approved and are queued for manual review by an
+        administrator. Configure how customers are handled while their review is pending.
+      </Text>
       <FormGroup>
         <Checkbox
-          label="Block Checkout During Manual Review"
+          label="Prevent checkout until manual review is complete"
           checked={manualReview.blockCheckout ?? false}
           onChange={(e) =>
             updateDraft({ manualReview: { ...manualReview, blockCheckout: e.target.checked } })
           }
         />
+        <Text color="secondary50" marginTop="xSmall">
+          When unchecked, the customer can proceed to checkout but will see the message below.
+        </Text>
       </FormGroup>
       <FormGroup>
-        <FormControlLabel htmlFor="edit-review-message">Manual Review Message</FormControlLabel>
+        <FormControlLabel htmlFor="edit-review-message">
+          Message shown to customer while review is pending
+        </FormControlLabel>
         <Textarea
           id="edit-review-message"
           value={manualReview.message ? String(manualReview.message) : ''}
