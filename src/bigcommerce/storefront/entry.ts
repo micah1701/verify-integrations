@@ -140,6 +140,22 @@ const COMPLETED_KEY = `adhoc_verify_done_${config.integrationKey}`;
 
 async function handleOrderConfirmationPage(): Promise<void> {
   log('Order confirmation page detected — checking for completed verification to write to order metafield.');
+
+  // storeHash/storeAccessToken may be absent if the merchant uses templateId-based config and
+  // the order-confirmation page is not in configPages (so bootstrap() never ran). Fetch the
+  // remote config now — we only need credentials, not the full init path.
+  if ((!config.storeHash || !config.storeAccessToken) && userConfig.templateId) {
+    log('Order confirmation: credentials not set — fetching from remote template config.');
+    const remote = await getTemplateIntegrationConfig(config.apiBase, config.integrationKey, userConfig.templateId);
+    if (remote?.ok) {
+      if (!userConfig.storeHash && remote.data.storeHash) config.storeHash = remote.data.storeHash;
+      if (!userConfig.storeAccessToken && remote.data.storeAccessToken) config.storeAccessToken = remote.data.storeAccessToken;
+      log('Order confirmation: remote config applied.');
+    } else {
+      log('Order confirmation: remote config fetch failed — cannot write order metafield.');
+    }
+  }
+
   if (!config.storeHash || !config.storeAccessToken) {
     log('Order confirmation: skipping — storeHash or storeAccessToken not configured.');
     return;
