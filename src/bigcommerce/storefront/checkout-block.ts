@@ -83,7 +83,7 @@ export function renderCheckoutWarn(message: string): void {
   banner.id = WARNING_ID;
   banner.style.cssText =
     'padding:10px 15px;margin:10px 0;background:#fff3cd;border:1px solid #ffc107;' +
-    'border-radius:4px;font-size:14px;color:#856404;';
+    'border-radius:4px;font-size:14px;color:#856404; position:fixed; top: 0; left: 0; width: 100%; z-index: 1000; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);  ';
   banner.textContent = message;
   const container = document.getElementById(CONTAINER_ID);
   if (container?.parentNode) {
