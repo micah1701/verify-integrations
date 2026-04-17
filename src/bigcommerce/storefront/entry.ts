@@ -115,8 +115,8 @@ function detectPage(): 'cart' | 'checkout' | 'order-confirmation' | null {
   if ((window as Window & { BCData?: { order_id?: number } }).BCData?.order_id) return 'order-confirmation';
   const p = window.location.pathname;
   if (p.includes('/cart')) return 'cart';
-  if (p.includes('/checkout')) return 'checkout';
   if (p.includes('/order-confirmation')) return 'order-confirmation';
+  if (p.includes('/checkout')) return 'checkout';
   return null;
 }
 
