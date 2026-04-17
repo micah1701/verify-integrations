@@ -15,7 +15,8 @@ function findCheckoutButton(): HTMLButtonElement | null {
   return (
     document.querySelector<HTMLButtonElement>('.checkout-button') ??
     document.querySelector<HTMLButtonElement>('#checkout-button') ??
-    document.querySelector<HTMLButtonElement>('[data-button-type="submit"]')
+    document.querySelector<HTMLButtonElement>('[data-button-type="submit"]') ??
+    document.querySelector<HTMLButtonElement>('button[type="submit"]')
   );
 }
 
