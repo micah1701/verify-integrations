@@ -211,8 +211,10 @@ function findOrCreateContainer(): HTMLElement {
   const existing = document.getElementById(CONTAINER_ID);
   if (existing) return existing;
 
+  const containerWrapper = document.createElement('div');
+  containerWrapper.id = CONTAINER_ID;
+  containerWrapper.classList.add('cart-content-padding-right'); // for themes that require this class on the .cart-content wrapper, e.g. Cornerstone
   const container = document.createElement('div');
-  container.id = CONTAINER_ID;
   container.style.cssText =
     'padding:15px;margin:20px 0;border:1px solid #ddd;background:#f9f9f9;text-align:center;';
 
@@ -222,11 +224,13 @@ function findOrCreateContainer(): HTMLElement {
     document.querySelector('form[action*="cart"]');
 
   if (target?.parentNode) {
-    target.parentNode.insertBefore(container, target);
+    target.parentNode.insertBefore(containerWrapper, target);
+    containerWrapper.appendChild(container);
   } else {
-    document.body.appendChild(container);
+    document.body.appendChild(containerWrapper);
+    containerWrapper.appendChild(container);
   }
-  return container;
+  return containerWrapper;
 }
 
 // ─── 4b. Cart Context (set during init) ──────────────────────────────────────
