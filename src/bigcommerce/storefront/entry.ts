@@ -213,26 +213,43 @@ function findOrCreateContainer(): HTMLElement {
 
   const containerWrapper = document.createElement('div');
   containerWrapper.id = CONTAINER_ID;
-  containerWrapper.classList.add('cart-content-padding-right'); // for themes that require this class on the .cart-content wrapper, e.g. Cornerstone
-  
+
   const container = document.createElement('div');
-  container.classList.add('cart-totals'); // for themes that style the checkout button based on proximity to .cart-totals, e.g. Cornerstone
   container.style.cssText =
     'padding:15px;margin:20px 0;border:1px solid #ddd;background:#f9f9f9;text-align:center;';
 
   containerWrapper.appendChild(container);
-  const target =
-    document.querySelector(config.selector) ??
-    document.querySelector('[data-cart-totals]') ??
-    document.querySelector('form[action*="cart"]');
 
-  if (target?.parentNode) {
-    target.parentNode.insertBefore(containerWrapper, target);
-    
+  if (isCheckout) {
+    // Checkout page: append after the existing content inside .checkout-step--customer
+    const step = document.querySelector('li.checkout-step--customer');
+    if (step) {
+      step.appendChild(containerWrapper);
+    } else {
+      document.body.appendChild(containerWrapper);
+    }
   } else {
-    document.body.appendChild(containerWrapper);
+    // Cart page: prefer the cart_below_totals Stencil region (theme-agnostic), then fall back
+    // to inserting before the cart actions element as before.
+    containerWrapper.classList.add('cart-content-padding-right');
+    container.classList.add('cart-totals');
 
+    const region = document.querySelector('[data-content-region="cart_below_totals"]');
+    if (region) {
+      region.appendChild(containerWrapper);
+    } else {
+      const target =
+        document.querySelector(config.selector) ??
+        document.querySelector('[data-cart-totals]') ??
+        document.querySelector('form[action*="cart"]');
+      if (target?.parentNode) {
+        target.parentNode.insertBefore(containerWrapper, target);
+      } else {
+        document.body.appendChild(containerWrapper);
+      }
+    }
   }
+
   return container;
 }
 
