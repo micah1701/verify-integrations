@@ -13,6 +13,7 @@ import { log } from './logger.js';
 
 const CONTAINER_ID = 'adhoc-verify-container';
 const WARNING_ID = 'adhoc-checkout-warning';
+const PLACE_ORDER_WARNING_ID = 'adhoc-place-order-warning';
 const BLOCKED_ATTR = 'data-adhoc-blocked';
 
 let observer: MutationObserver | null = null;
@@ -21,6 +22,32 @@ let observer: MutationObserver | null = null;
 // be cleaned up reliably even if React re-creates the element.
 let blockedButton: HTMLButtonElement | null = null;
 let blockClickHandler: ((e: Event) => void) | null = null;
+
+function insertPlaceOrderWarning(btn: HTMLElement): void {
+  document.getElementById(PLACE_ORDER_WARNING_ID)?.remove();
+
+  const warning = document.createElement('div');
+  warning.id = PLACE_ORDER_WARNING_ID;
+  warning.style.cssText =
+    'padding:10px 15px;margin:0 0 10px 0;background:#fff3cd;border:1px solid #ffc107;' +
+    'border-radius:4px;font-size:14px;color:#856404;';
+
+  const link = document.createElement('button');
+  link.textContent = 'Complete verification';
+  link.style.cssText =
+    'background:none;border:none;padding:0;color:#856404;text-decoration:underline;' +
+    'cursor:pointer;font-size:inherit;font-family:inherit;';
+  link.addEventListener('click', () => {
+    document.getElementById(CONTAINER_ID)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+
+  warning.appendChild(document.createTextNode('Identity verification required — '));
+  warning.appendChild(link);
+  warning.appendChild(document.createTextNode(' to place your order.'));
+
+  btn.parentElement?.insertBefore(warning, btn);
+  log('insertPlaceOrderWarning: warning inserted near Place Order button.');
+}
 
 function findCheckoutButton(): HTMLButtonElement | null {
   return (
@@ -72,6 +99,7 @@ function applyCheckoutButtonBlock(): void {
   }
   btn.addEventListener('click', blockClickHandler, true);
   blockedButton = btn;
+  insertPlaceOrderWarning(btn);
 
   log('applyCheckoutButtonBlock: checkout button blocked (pointer-events:none + click capture).');
 }
@@ -137,12 +165,13 @@ export function removeCheckoutBlock(): void {
   log('removeCheckoutBlock: removing checkout block and re-enabling checkout button.');
   disconnectObserver();
 
-  // Remove warning banner
+  // Remove warning banners
   const warning = document.getElementById(WARNING_ID);
   if (warning) {
     warning.parentNode?.removeChild(warning);
     log('removeCheckoutBlock: warning banner removed from DOM.');
   }
+  document.getElementById(PLACE_ORDER_WARNING_ID)?.remove();
 
   // Detach click handler from tracked element
   if (blockedButton && blockClickHandler) {
