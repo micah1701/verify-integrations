@@ -621,7 +621,69 @@ function destroyModal(modal: InstanceType<typeof VerifyModal>): void {
   modalWrapperEl = null;
 }
 
-// ─── 8. Bootstrap ────────────────────────────────────────────────────────────
+// ─── 8. Cart Trigger Watcher ─────────────────────────────────────────────────
+
+async function recheckTriggerRule(): Promise<void> {
+  log('recheckTriggerRule: re-evaluating trigger rule after cart change.');
+  const cart = await loadCart();
+  const shouldShow = cart ? evaluateTriggerRule(cart.productIds ?? [], config.triggerRule) : false;
+  const container = document.getElementById(CONTAINER_ID);
+  const isShown = container !== null;
+
+  if (shouldShow === isShown) {
+    log(`recheckTriggerRule: visibility unchanged (shouldShow=${shouldShow}) — no action.`);
+    return;
+  }
+
+  if (shouldShow) {
+    log('recheckTriggerRule: trigger now active — initializing widget.');
+    await init();
+  } else {
+    log('recheckTriggerRule: trigger no longer active — hiding widget.');
+    container!.remove();
+    statusCardInstance?.$destroy();
+    statusCardInstance = null;
+    removeCheckoutBlock();
+  }
+}
+
+function watchCartTrigger(): void {
+  if (!config.triggerRule || config.triggerRule.mode === 'always') {
+    log('watchCartTrigger: trigger mode is "always" — skipping cart change watcher.');
+    return;
+  }
+
+  log('watchCartTrigger: installing fetch interceptor to watch for cart mutations.');
+  const originalFetch = window.fetch.bind(window);
+  let recheckPending = false;
+
+  window.fetch = async function (input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+    const response = await originalFetch(input, init);
+
+    const url =
+      typeof input === 'string' ? input
+      : input instanceof URL ? input.href
+      : (input as Request).url;
+    const method = (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase();
+
+    if (
+      url.includes('/api/storefront/carts') &&
+      (method === 'POST' || method === 'PUT' || method === 'DELETE')
+    ) {
+      if (!recheckPending) {
+        recheckPending = true;
+        setTimeout(() => {
+          recheckPending = false;
+          void recheckTriggerRule();
+        }, 150);
+      }
+    }
+
+    return response;
+  };
+}
+
+// ─── 9. Bootstrap ────────────────────────────────────────────────────────────
 
 // If a templateId is provided, fetch integration_config from the API and apply
 // remote values for any fields the merchant did not explicitly set in the script tag.
@@ -665,6 +727,7 @@ async function bootstrap(): Promise<void> {
     log('No templateId configured — skipping remote config fetch, using local config only.');
   }
   await init();
+  watchCartTrigger();
 }
 
 if (document.readyState === 'loading') {
