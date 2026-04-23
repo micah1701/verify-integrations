@@ -214,10 +214,13 @@ function findOrCreateContainer(): HTMLElement {
   const containerWrapper = document.createElement('div');
   containerWrapper.id = CONTAINER_ID;
   containerWrapper.classList.add('cart-content-padding-right'); // for themes that require this class on the .cart-content wrapper, e.g. Cornerstone
+  
   const container = document.createElement('div');
+  container.classList.add('cart-totals'); // for themes that style the checkout button based on proximity to .cart-totals, e.g. Cornerstone
   container.style.cssText =
     'padding:15px;margin:20px 0;border:1px solid #ddd;background:#f9f9f9;text-align:center;';
 
+  containerWrapper.appendChild(container);
   const target =
     document.querySelector(config.selector) ??
     document.querySelector('[data-cart-totals]') ??
@@ -225,12 +228,12 @@ function findOrCreateContainer(): HTMLElement {
 
   if (target?.parentNode) {
     target.parentNode.insertBefore(containerWrapper, target);
-    containerWrapper.appendChild(container);
+    
   } else {
     document.body.appendChild(containerWrapper);
-    containerWrapper.appendChild(container);
+
   }
-  return containerWrapper;
+  return container;
 }
 
 // ─── 4b. Cart Context (set during init) ──────────────────────────────────────
