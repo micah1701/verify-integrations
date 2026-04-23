@@ -374,6 +374,7 @@ async function init(): Promise<void> {
   // Trigger rule: hide the widget entirely if this cart doesn't qualify
   if (!evaluateTriggerRule(cart.productIds ?? [], config.triggerRule)) {
     log(`Trigger rule (mode="${config.triggerRule?.mode}"): cart products do not match — widget hidden.`);
+    container.remove();
     return;
   }
   log(`Trigger rule (mode="${config.triggerRule?.mode}"): cart products match — proceeding.`);

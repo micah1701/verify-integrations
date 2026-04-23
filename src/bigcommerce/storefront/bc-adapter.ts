@@ -3,7 +3,6 @@ import { bcMetafieldsProxy, buildMetafieldPayload } from '../../core/verify-api.
 import type { BCRawMetafield, ResolvedMetafield, VerificationOutcome, VerificationStatus } from '../../core/types.js';
 import { log } from './logger.js';
 
-const TTL_CART = 5 * 60 * 1000;   // 5 min
 const TTL_JWT  = 30 * 60 * 1000;  // 30 min
 const TTL_MF   = 5 * 60 * 1000;   // 5 min
 
@@ -16,13 +15,7 @@ export interface CartInfo {
 }
 
 export async function loadCart(): Promise<CartInfo | null> {
-  const cached = await dbGet<CartInfo>('adhoc_cart');
-  if (cached) {
-    log('loadCart: cache hit.', cached);
-    return cached;
-  }
-
-  log('loadCart: cache miss — fetching from BC Storefront API.');
+  log('loadCart: fetching from BC Storefront API.');
   try {
     const r = await fetch(
       '/api/storefront/carts?include=lineItems.physicalItems.options,lineItems.digitalItems.options',
@@ -49,7 +42,6 @@ export async function loadCart(): Promise<CartInfo | null> {
     const productIds = [...new Set([...physicalIds, ...digitalIds])];
     const result: CartInfo = { cartId: cart.id, customerId: cart.customerId ?? 0, productIds };
     log(`loadCart: cartId="${result.cartId}", customerId=${result.customerId}, loggedIn=${result.customerId !== 0}, productIds=[${productIds.join(', ')}]`);
-    await dbSet('adhoc_cart', result, TTL_CART);
     return result;
   } catch (err) {
     log('loadCart: fetch threw an error — returning null.', (err as Error).message);
@@ -270,7 +262,7 @@ export async function invalidateMetafieldCache(
 ): Promise<void> {
   log(`invalidateMetafieldCache: clearing cart cache (cartId="${cartId}")${customerId !== 0 ? ` and customer cache (customerId=${customerId})` : ''}.`);
   const { dbDel } = await import('../../core/cache.js');
-  const dels: Promise<void>[] = [dbDel('adhoc_cart'), dbDel(`adhoc_cart_mf_${cartId}`)];
+  const dels: Promise<void>[] = [dbDel(`adhoc_cart_mf_${cartId}`)];
   if (customerId && customerId !== 0) dels.push(dbDel(`adhoc_customer_mf_${customerId}`));
   await Promise.all(dels);
   log('invalidateMetafieldCache: done.');
