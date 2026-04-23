@@ -666,10 +666,17 @@ function watchCartTrigger(): void {
       : (input as Request).url;
     const method = (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase();
 
-    if (
+    const isModernCartMutation =
       url.includes('/api/storefront/carts') &&
-      (method === 'POST' || method === 'PUT' || method === 'DELETE')
-    ) {
+      (method === 'POST' || method === 'PUT' || method === 'DELETE');
+    // Legacy Stencil/Cornerstone endpoints used by older themes via stencil-utils
+    const isLegacyCartMutation =
+      (url.includes('/remote/v1/cart/add') ||
+        url.includes('/remote/v1/cart/update') ||
+        url.includes('/remote/v1/cart/remove')) &&
+      method === 'POST';
+
+    if (isModernCartMutation || isLegacyCartMutation) {
       if (!recheckPending) {
         recheckPending = true;
         setTimeout(() => {
@@ -681,6 +688,38 @@ function watchCartTrigger(): void {
 
     return response;
   };
+
+  // Legacy themes may use XMLHttpRequest instead of fetch for /remote/v1/ endpoints
+  const OriginalXHR = window.XMLHttpRequest;
+  class PatchedXHR extends OriginalXHR {
+    private _method = '';
+    private _url = '';
+
+    open(method: string, url: string, async = true, user?: string, password?: string): void {
+      this._method = method.toUpperCase();
+      this._url = url;
+      super.open(method, url, async, user, password);
+    }
+
+    send(...args: Parameters<XMLHttpRequest['send']>): void {
+      this.addEventListener('load', () => {
+        const isLegacy =
+          (this._url.includes('/remote/v1/cart/add') ||
+            this._url.includes('/remote/v1/cart/update') ||
+            this._url.includes('/remote/v1/cart/remove')) &&
+          this._method === 'POST';
+        if (isLegacy && !recheckPending) {
+          recheckPending = true;
+          setTimeout(() => {
+            recheckPending = false;
+            void recheckTriggerRule();
+          }, 150);
+        }
+      });
+      super.send(...args);
+    }
+  }
+  window.XMLHttpRequest = PatchedXHR as typeof XMLHttpRequest;
 }
 
 // ─── 9. Bootstrap ────────────────────────────────────────────────────────────
