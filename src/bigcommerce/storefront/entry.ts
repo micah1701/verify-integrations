@@ -393,7 +393,19 @@ async function handleManualReviewResult(id: string): Promise<void> {
   }
 }
 
-// ─── 6. Name-Match Helpers ───────────────────────────────────────────────────
+// ─── 6. Block-Reason Helper ──────────────────────────────────────────────────
+
+// Returns a human-readable reason for why checkout is blocked when a *completed*
+// verification doesn't satisfy the ruleset, so the user understands what went wrong.
+function getBlockReason(mfValue: MetafieldValue | undefined): string | null {
+  if (!mfValue || mfValue.status !== 'completed') return null;
+  const v = mfValue.verification;
+  if (config.ruleset.requireOver21 && !v.over_21) return 'Your verification shows you do not meet the age requirement. You must be 21 or older to complete this purchase.';
+  if (config.ruleset.requireOver18 && !v.over_18) return 'Your verification shows you do not meet the age requirement. You must be 18 or older to complete this purchase.';
+  return null;
+}
+
+// ─── 6b. Name-Match Helpers ──────────────────────────────────────────────────
 
 async function getBlockchainName(verificationId: string): Promise<string | null> {
   if (_blockchainName) return _blockchainName;
@@ -474,8 +486,11 @@ async function setupNameMatch(mfValue: MetafieldValue | undefined): Promise<void
     _blockchainName = await getBlockchainName(verificationId);
   }
 
+  const MSG_ENTER_NAME = 'Please enter your shipping name — it must exactly match the name on your driver\'s license.';
+  const MSG_NAME_MISMATCH = 'The name in the shipping address does not exactly match the name on your driver\'s license.';
+
   log(`setupNameMatch: blockchain_name ${_blockchainName ? 'found' : 'not available'} — blocking checkout until name confirmed.`);
-  renderCheckoutBlock();
+  renderCheckoutBlock(MSG_ENTER_NAME);
 
   _nameWatcherCleanup?.();
   _nameWatcherCleanup = watchShippingNameInputs(verificationId, (match) => {
@@ -483,8 +498,10 @@ async function setupNameMatch(mfValue: MetafieldValue | undefined): Promise<void
     log(`Name match state: ${String(match)}`);
     if (match === true) {
       removeCheckoutBlock();
+    } else if (match === false) {
+      renderCheckoutBlock(MSG_NAME_MISMATCH);
     } else {
-      renderCheckoutBlock();
+      renderCheckoutBlock(MSG_ENTER_NAME);
     }
   });
 }
@@ -643,7 +660,7 @@ async function init(): Promise<void> {
           const enforcement = getEffectiveEnforcement(config);
           if (enforcement === 'block') {
             log(`Backfill: state="${reresolved.state}" + enforcement=block — rendering checkout block.`);
-            renderCheckoutBlock();
+            renderCheckoutBlock(getBlockReason(backfilledMf.value));
           } else if (enforcement === 'warn') {
             const msg = config.checkoutEnforcement?.warningMessage || DEFAULT_WARN_MESSAGE;
             log(`Backfill: state="${reresolved.state}" + enforcement=warn — showing warning banner.`);
@@ -673,7 +690,8 @@ async function init(): Promise<void> {
     const enforcement = getEffectiveEnforcement(config);
     if (enforcement === 'block') {
       log(`State is "${resolved.state}" + enforcement=block — rendering checkout block.`);
-      renderCheckoutBlock();
+      const resolvedMfValue = resolved.source === 'customer' ? customerMf?.value : cartMf?.value;
+      renderCheckoutBlock(getBlockReason(resolvedMfValue));
     } else if (enforcement === 'warn') {
       const msg = config.checkoutEnforcement?.warningMessage || DEFAULT_WARN_MESSAGE;
       log(`State is "${resolved.state}" + enforcement=warn — showing warning banner.`);

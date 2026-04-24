@@ -20,6 +20,10 @@ const BLOCKED_ATTR = 'data-adhoc-blocked';
 let observer: MutationObserver | null = null;
 let shippingNoticeObserver: MutationObserver | null = null;
 
+// When set, overrides the generic banner/button text with a specific reason.
+// Cleared by removeCheckoutBlock() and persisted for MutationObserver re-applications.
+let currentBlockMessage: string | null = null;
+
 // Tracks the currently-blocked button element and its click handler so both can
 // be cleaned up reliably even if React re-creates the element.
 let blockedButton: HTMLButtonElement | null = null;
@@ -34,18 +38,23 @@ function insertPlaceOrderWarning(btn: HTMLElement): void {
     'padding:10px 15px;margin:0 0 10px 0;background:#fff3cd;border:1px solid #ffc107;' +
     'border-radius:4px;font-size:14px;color:#856404;';
 
-  const link = document.createElement('button');
-  link.textContent = 'Complete verification';
-  link.style.cssText =
-    'background:none;border:none;padding:0;color:#856404;text-decoration:underline;' +
-    'cursor:pointer;font-size:inherit;font-family:inherit;';
-  link.addEventListener('click', () => {
-    document.getElementById(CONTAINER_ID)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  });
-
-  warning.appendChild(document.createTextNode('Identity verification required — '));
-  warning.appendChild(link);
-  warning.appendChild(document.createTextNode(' to place your order.'));
+  if (currentBlockMessage) {
+    // Verification is done but blocked for a specific reason — show that reason directly.
+    // No "Complete verification" link since re-verifying won't help.
+    warning.textContent = currentBlockMessage;
+  } else {
+    const link = document.createElement('button');
+    link.textContent = 'Complete verification';
+    link.style.cssText =
+      'background:none;border:none;padding:0;color:#856404;text-decoration:underline;' +
+      'cursor:pointer;font-size:inherit;font-family:inherit;';
+    link.addEventListener('click', () => {
+      document.getElementById(CONTAINER_ID)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+    warning.appendChild(document.createTextNode('Identity verification required — '));
+    warning.appendChild(link);
+    warning.appendChild(document.createTextNode(' to place your order.'));
+  }
 
   btn.parentElement?.insertBefore(warning, btn);
   log('insertPlaceOrderWarning: warning inserted near Place Order button.');
@@ -106,16 +115,23 @@ function applyCheckoutButtonBlock(): void {
   log('applyCheckoutButtonBlock: checkout button blocked (pointer-events:none + click capture).');
 }
 
-export function renderCheckoutBlock(): void {
+export function renderCheckoutBlock(message?: string | null): void {
+  currentBlockMessage = message !== undefined ? (message ?? null) : currentBlockMessage;
+  const bannerText = currentBlockMessage ?? 'Identity verification is required to complete your purchase.';
+
   log('renderCheckoutBlock: installing verification-required warning and blocking checkout button.');
-  // Insert warning banner once
-  if (!document.getElementById(WARNING_ID)) {
+  const existingBanner = document.getElementById(WARNING_ID);
+  if (existingBanner) {
+    // Update text in place so the message stays current if the reason changed.
+    if (existingBanner.textContent !== bannerText) existingBanner.textContent = bannerText;
+    log('renderCheckoutBlock: warning banner already present — text updated.');
+  } else {
     const banner = document.createElement('div');
     banner.id = WARNING_ID;
     banner.style.cssText =
       'padding:10px 15px;margin:10px 0;background:#fff3cd;border:1px solid #ffc107;' +
       'border-radius:4px;font-size:14px;color:#856404;';
-    banner.textContent = 'Identity verification is required to complete your purchase.';
+    banner.textContent = bannerText;
     const container = document.getElementById(CONTAINER_ID);
     if (container?.parentNode) {
       container.parentNode.insertBefore(banner, container.nextSibling);
@@ -123,8 +139,6 @@ export function renderCheckoutBlock(): void {
     } else {
       log('renderCheckoutBlock: container not found — warning banner could not be inserted.');
     }
-  } else {
-    log('renderCheckoutBlock: warning banner already present — skipping insert.');
   }
 
   applyCheckoutButtonBlock();
@@ -165,6 +179,7 @@ export function renderCheckoutWarn(message: string): void {
 
 export function removeCheckoutBlock(): void {
   log('removeCheckoutBlock: removing checkout block and re-enabling checkout button.');
+  currentBlockMessage = null;
   disconnectObserver();
 
   // Remove warning banners
