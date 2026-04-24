@@ -170,10 +170,30 @@ async function handleOrderConfirmationPage(): Promise<void> {
   }
 
   const bcData = (window as Window & { BCData?: { order_id?: number } }).BCData;
-  const orderId =
+  let orderId: string | null =
     bcData?.order_id?.toString() ??
     window.location.pathname.match(/\/order-confirmation\/(\d+)/)?.[1] ??
     null;
+
+  if (!orderId) {
+    // BCData is empty for guest checkouts and the URL has no order ID — fall back to the
+    // BC Storefront Orders API, which BC's own confirmation page calls and works for guests.
+    log('Order confirmation: BCData and URL both lack order ID — querying /api/storefront/orders.');
+    try {
+      const res = await fetch('/api/storefront/orders?limit=1', { credentials: 'same-origin' });
+      if (res.ok) {
+        const orders = await res.json() as Array<{ id?: number }>;
+        const id = orders?.[0]?.id;
+        if (id) {
+          orderId = String(id);
+          log(`Order confirmation: resolved orderId="${orderId}" from storefront orders API.`);
+        }
+      }
+    } catch (_) {
+      log('Order confirmation: storefront orders API request failed.');
+    }
+  }
+
   if (!orderId) {
     log('Order confirmation: could not determine order ID — skipping metafield write.');
     return;
