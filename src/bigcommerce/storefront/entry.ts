@@ -650,6 +650,74 @@ async function init(): Promise<void> {
     }
   }
 
+  // Guest session carry-over: verified as a guest on a previous cart in this session.
+  // The old cart's metafield is gone, but COMPLETED_KEY is still in sessionStorage — propagate
+  // it to the new cart so the customer doesn't have to re-verify.
+  if (_customerId === 0 && resolved.state !== 'verified' && config.storeHash && config.storeAccessToken) {
+    const completedJson = sessionStorage.getItem(COMPLETED_KEY);
+    if (completedJson) {
+      log('Guest user: found completed verification in sessionStorage — propagating to new cart metafield.');
+      try {
+        const { verificationId, result, status } = JSON.parse(completedJson) as {
+          verificationId: string;
+          result: VerificationOutcome | null;
+          status: VerificationStatus;
+        };
+        log(`Guest carry-over payload: verificationId="${verificationId}", status="${status}"`, result);
+        await saveCartMetafield(
+          config.apiBase,
+          config.storeHash,
+          config.storeAccessToken,
+          _cartId,
+          verificationId,
+          result,
+          _cartMfId,
+          status,
+        );
+        await invalidateMetafieldCache(_cartId, _customerId);
+        log('Guest cart metafield written and cache invalidated.');
+        const carriedMf = {
+          id: 0,
+          value: {
+            verificationId,
+            status,
+            completedAt: '',
+            verification: result ?? { success: null, over_18: null, over_21: null, face_match_score: null },
+          },
+        };
+        const reresolved = resolveOverallState(carriedMf, null, config.ruleset);
+        log(`Re-resolved state after guest carry-over: state="${reresolved.state}", source="${reresolved.source}"`);
+        _cartMfId = reresolved.cartMfId ?? undefined;
+        mountStatusCard(container, reresolved.state);
+        if (reresolved.state === 'pending_review') {
+          if (isCheckout && config.manualReview?.blockCheckout) {
+            log('Guest carry-over: pending_review + blockCheckout=true — rendering checkout block.');
+            renderCheckoutBlock();
+          }
+        } else if (reresolved.state === 'verified') {
+          if (isCheckout && config.ruleset.requireNameMatch === true) {
+            await setupNameMatch(carriedMf.value);
+          } else {
+            log('Guest carry-over: verified — checkout block not required.');
+          }
+        } else if (isCheckout) {
+          const enforcement = getEffectiveEnforcement(config);
+          if (enforcement === 'block') {
+            log(`Guest carry-over: state="${reresolved.state}" + enforcement=block — rendering checkout block.`);
+            renderCheckoutBlock(getBlockReason(carriedMf.value));
+          } else if (enforcement === 'warn') {
+            const msg = config.checkoutEnforcement?.warningMessage || DEFAULT_WARN_MESSAGE;
+            log(`Guest carry-over: state="${reresolved.state}" + enforcement=warn — showing warning banner.`);
+            renderCheckoutWarn(msg);
+          }
+        }
+        return;
+      } catch (_) {
+        log('Guest session carry-over failed (non-fatal) — continuing with resolved state.');
+      }
+    }
+  }
+
   // Backfill: if now logged in but no customer metafield, check for a completed verification
   // from earlier in this session (e.g. verified as guest, then created an account).
   if (_customerId !== 0 && !customerMf && config.storeHash && config.storeAccessToken) {
