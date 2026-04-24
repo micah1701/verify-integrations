@@ -445,6 +445,18 @@ function watchShippingNameInputs(
 
     if (newFirst === firstInput && newLast === lastInput) return;
 
+    // If inputs have disappeared (BC collapsed the shipping form to read-only after "Continue"),
+    // preserve the current match state rather than treating absent inputs as "no name entered".
+    // The name the customer typed hasn't changed — the form just moved to display mode.
+    if (!newFirst && !newLast && (firstInput !== null || lastInput !== null)) {
+      firstInput?.removeEventListener('input', handleInput);
+      lastInput?.removeEventListener('input', handleInput);
+      firstInput = null;
+      lastInput = null;
+      log('watchShippingNameInputs: shipping form collapsed to read-only — preserving match state.');
+      return;
+    }
+
     firstInput?.removeEventListener('input', handleInput);
     lastInput?.removeEventListener('input', handleInput);
 
