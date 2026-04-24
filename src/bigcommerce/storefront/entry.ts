@@ -33,10 +33,10 @@ import {
   saveOrderMetafield,
   invalidateMetafieldCache,
 } from './bc-adapter.js';
-import { renderCheckoutBlock, removeCheckoutBlock, renderCheckoutWarn } from './checkout-block.js';
+import { renderCheckoutBlock, removeCheckoutBlock, renderCheckoutWarn, insertShippingNameNotice, removeShippingNameNotice } from './checkout-block.js';
 import { resolveOverallState } from '../../core/verification-state.js';
-import { createVerification, getTemplateIntegrationConfig } from '../../core/verify-api.js';
-import type { AdHocVerifyConfig, CheckoutEnforcement, IntegrationConfig, VerificationOutcome, VerificationState, VerificationStatus, VerifyTriggerRule } from '../../core/types.js';
+import { createVerification, getTemplateIntegrationConfig, getVerificationResult, computeNameHash } from '../../core/verify-api.js';
+import type { AdHocVerifyConfig, CheckoutEnforcement, IntegrationConfig, MetafieldValue, VerificationOutcome, VerificationState, VerificationStatus, VerifyTriggerRule } from '../../core/types.js';
 import { log, setLogging } from './logger.js';
 
 // Injected at build time via Vite define
@@ -66,6 +66,9 @@ const defaults: Omit<AdHocVerifyConfig, 'integrationKey'> = {
 
 const DEFAULT_WARN_MESSAGE =
   'Your order may incur shipping delays or be cancelled until your identity can be verified.';
+
+const DEFAULT_NAME_NOTICE =
+  'Important: The first and last name you enter here must exactly match the name on the driver\'s license used to verify your identity.';
 
 /** Returns true if the widget should be shown given the cart's product IDs and the configured trigger rule. */
 function evaluateTriggerRule(productIds: number[], rule?: VerifyTriggerRule): boolean {
@@ -259,6 +262,9 @@ let _cartId = '';
 let _customerId = 0;
 let _cartMfId: number | undefined;
 let _customerMfId: number | undefined;
+let _blockchainName: string | null = null;
+let _nameMatchState: boolean | null = null;
+let _nameWatcherCleanup: (() => void) | null = null;
 
 // Svelte 4 component instance references
 let statusCardInstance: InstanceType<typeof StatusCard> | null = null;
@@ -305,8 +311,20 @@ async function saveVerificationAndRefreshUI(
 
   // Update Svelte component prop → StatusCard re-renders
   statusCardInstance?.$set({ state: 'verified' as VerificationState });
-  removeCheckoutBlock();
-  log('UI updated to "verified" state, checkout block removed.');
+
+  if (isCheckout && config.ruleset.requireNameMatch === true) {
+    _blockchainName = result?.blockchain_name ?? null;
+    await setupNameMatch({
+      verificationId: id,
+      status: 'completed',
+      completedAt: new Date().toISOString(),
+      verification: result ?? { success: null, over_18: null, over_21: null, face_match_score: null },
+    });
+    log('UI updated to "verified" state, name match check started.');
+  } else {
+    removeCheckoutBlock();
+    log('UI updated to "verified" state, checkout block removed.');
+  }
 
   if (typeof config.onComplete === 'function') config.onComplete(id);
   if (typeof config.onResult === 'function') {
@@ -375,7 +393,103 @@ async function handleManualReviewResult(id: string): Promise<void> {
   }
 }
 
-// ─── 6. Init ─────────────────────────────────────────────────────────────────
+// ─── 6. Name-Match Helpers ───────────────────────────────────────────────────
+
+async function getBlockchainName(verificationId: string): Promise<string | null> {
+  if (_blockchainName) return _blockchainName;
+  const res = await getVerificationResult(config.apiBase, verificationId);
+  _blockchainName = res?.result?.blockchain_name ?? null;
+  return _blockchainName;
+}
+
+function watchShippingNameInputs(
+  verificationId: string,
+  onMatchChange: (match: boolean | null) => void,
+): () => void {
+  let firstInput: HTMLInputElement | null = null;
+  let lastInput: HTMLInputElement | null = null;
+  let nameObserver: MutationObserver | null = null;
+
+  const handleInput = (): void => { void checkMatch(); };
+
+  async function checkMatch(): Promise<void> {
+    const first = firstInput?.value?.trim() ?? '';
+    const last = lastInput?.value?.trim() ?? '';
+    if ((!first && !last) || !_blockchainName) {
+      onMatchChange(null);
+      return;
+    }
+    const computed = await computeNameHash(first, last, verificationId);
+    onMatchChange(computed === _blockchainName);
+  }
+
+  function attachListeners(): void {
+    const newFirst =
+      document.querySelector<HTMLInputElement>('input[autocomplete="given-name"]') ??
+      document.querySelector<HTMLInputElement>('input[id*="firstName"]');
+    const newLast =
+      document.querySelector<HTMLInputElement>('input[autocomplete="family-name"]') ??
+      document.querySelector<HTMLInputElement>('input[id*="lastName"]');
+
+    if (newFirst === firstInput && newLast === lastInput) return;
+
+    firstInput?.removeEventListener('input', handleInput);
+    lastInput?.removeEventListener('input', handleInput);
+
+    firstInput = newFirst;
+    lastInput = newLast;
+
+    firstInput?.addEventListener('input', handleInput);
+    lastInput?.addEventListener('input', handleInput);
+
+    void checkMatch();
+    log('watchShippingNameInputs: attached to name input fields.');
+  }
+
+  attachListeners();
+
+  nameObserver = new MutationObserver(() => attachListeners());
+  nameObserver.observe(document.body, { childList: true, subtree: true });
+
+  return (): void => {
+    nameObserver?.disconnect();
+    nameObserver = null;
+    firstInput?.removeEventListener('input', handleInput);
+    lastInput?.removeEventListener('input', handleInput);
+    firstInput = null;
+    lastInput = null;
+    log('watchShippingNameInputs: cleaned up.');
+  };
+}
+
+async function setupNameMatch(mfValue: MetafieldValue | undefined): Promise<void> {
+  const verificationId = mfValue?.verificationId;
+  if (!verificationId) {
+    log('setupNameMatch: no verificationId available — skipping.');
+    return;
+  }
+
+  _blockchainName = mfValue?.verification?.blockchain_name ?? null;
+  if (!_blockchainName) {
+    _blockchainName = await getBlockchainName(verificationId);
+  }
+
+  log(`setupNameMatch: blockchain_name ${_blockchainName ? 'found' : 'not available'} — blocking checkout until name confirmed.`);
+  renderCheckoutBlock();
+
+  _nameWatcherCleanup?.();
+  _nameWatcherCleanup = watchShippingNameInputs(verificationId, (match) => {
+    _nameMatchState = match;
+    log(`Name match state: ${String(match)}`);
+    if (match === true) {
+      removeCheckoutBlock();
+    } else {
+      renderCheckoutBlock();
+    }
+  });
+}
+
+// ─── 7. Init ─────────────────────────────────────────────────────────────────
 
 async function init(): Promise<void> {
   log('Initializing verification widget...');
@@ -435,6 +549,10 @@ async function init(): Promise<void> {
 
   _cartMfId = resolved.cartMfId ?? undefined;
   _customerMfId = resolved.customerMfId ?? undefined;
+
+  if (isCheckout && config.ruleset.requireNameMatch === true) {
+    insertShippingNameNotice(DEFAULT_NAME_NOTICE);
+  }
 
   // Returning verified customer: their customer metafield carries a verified status from a prior
   // session/device. Write that verification to the cart metafield now so cart and order records
@@ -517,7 +635,11 @@ async function init(): Promise<void> {
             log('Backfill: pending_review + blockCheckout=true — rendering checkout block.');
             renderCheckoutBlock();
           }
-        } else if (reresolved.state !== 'verified' && isCheckout) {
+        } else if (reresolved.state === 'verified') {
+          if (isCheckout && config.ruleset.requireNameMatch === true) {
+            await setupNameMatch(backfilledMf.value);
+          }
+        } else if (isCheckout) {
           const enforcement = getEffectiveEnforcement(config);
           if (enforcement === 'block') {
             log(`Backfill: state="${reresolved.state}" + enforcement=block — rendering checkout block.`);
@@ -560,11 +682,16 @@ async function init(): Promise<void> {
       log(`State is "${resolved.state}" + enforcement=none — no checkout action.`);
     }
   } else if (resolved.state === 'verified') {
-    log('Customer is verified — checkout block not required.');
+    if (isCheckout && config.ruleset.requireNameMatch === true) {
+      const resolvedMfValue = resolved.source === 'customer' ? customerMf?.value : cartMf?.value;
+      await setupNameMatch(resolvedMfValue);
+    } else {
+      log('Customer is verified — checkout block not required.');
+    }
   }
 }
 
-// ─── 7. Svelte 4 Component Mounting ─────────────────────────────────────────
+// ─── 8. Svelte 4 Component Mounting ─────────────────────────────────────────
 
 function mountStatusCard(container: HTMLElement, initialState: VerificationState): void {
   container.innerHTML = '';

@@ -22,6 +22,7 @@ export interface Ruleset {
   minFaceMatchScore: FaceMatchScore | null;
   requireOver18: boolean;
   requireOver21: boolean;
+  requireNameMatch?: boolean;
 }
 
 // ─── Trigger Rule (when to show the Verify ID widget) ─────────────────────────
@@ -59,6 +60,7 @@ export interface VerificationOutcome {
   over_18: boolean | null;
   over_21: boolean | null;
   face_match_score: FaceMatchScore | null;
+  blockchain_name?: string | null;
 }
 
 // ─── BC Metafield Stored Value ────────────────────────────────────────────────

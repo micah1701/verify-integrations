@@ -14,9 +14,11 @@ import { log } from './logger.js';
 const CONTAINER_ID = 'adhoc-verify-container';
 const WARNING_ID = 'adhoc-checkout-warning';
 const PLACE_ORDER_WARNING_ID = 'adhoc-place-order-warning';
+const SHIPPING_NOTICE_ID = 'adhoc-name-notice';
 const BLOCKED_ATTR = 'data-adhoc-blocked';
 
 let observer: MutationObserver | null = null;
+let shippingNoticeObserver: MutationObserver | null = null;
 
 // Tracks the currently-blocked button element and its click handler so both can
 // be cleaned up reliably even if React re-creates the element.
@@ -202,4 +204,52 @@ export function disconnectObserver(): void {
     observer = null;
     log('disconnectObserver: MutationObserver stopped.');
   }
+}
+
+export function insertShippingNameNotice(message: string): void {
+  function tryInsert(): void {
+    if (document.getElementById(SHIPPING_NOTICE_ID)) return;
+
+    const input = document.querySelector<HTMLInputElement>('input[autocomplete="given-name"]');
+    if (!input) return;
+
+    // Walk up to find a form body / fieldset container to insert before
+    let target: Element | null = input.parentElement;
+    for (let i = 0; i < 5 && target; i++) {
+      const cls = (target as HTMLElement).className || '';
+      if (cls.includes('form-body') || cls.includes('address-form') || target.tagName === 'FIELDSET') break;
+      target = target.parentElement;
+    }
+
+    const notice = document.createElement('div');
+    notice.id = SHIPPING_NOTICE_ID;
+    notice.style.cssText =
+      'padding:10px 15px;margin:0 0 12px 0;background:#e8f4fd;border:1px solid #90c4e8;' +
+      'border-radius:4px;font-size:13px;color:#1a5276;';
+    notice.textContent = message;
+
+    if (target?.parentNode) {
+      target.parentNode.insertBefore(notice, target);
+    } else {
+      input.parentNode?.insertBefore(notice, input);
+    }
+
+    log('insertShippingNameNotice: notice inserted near shipping name fields.');
+  }
+
+  tryInsert();
+
+  // Keep watching so the notice is re-inserted if React re-renders the shipping form
+  if (!shippingNoticeObserver) {
+    shippingNoticeObserver = new MutationObserver(() => tryInsert());
+    shippingNoticeObserver.observe(document.body, { childList: true, subtree: true });
+    log('insertShippingNameNotice: MutationObserver watching for shipping form renders.');
+  }
+}
+
+export function removeShippingNameNotice(): void {
+  document.getElementById(SHIPPING_NOTICE_ID)?.remove();
+  shippingNoticeObserver?.disconnect();
+  shippingNoticeObserver = null;
+  log('removeShippingNameNotice: notice removed.');
 }

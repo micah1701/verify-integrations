@@ -418,6 +418,7 @@ function ReadOnlyConfig({ configData }: { configData: IntegrationConfig }) {
     { label: 'Min Face Match Score', value: configData.ruleset?.minFaceMatchScore ?? 'Any' },
     { label: 'Require Over 18', value: configData.ruleset?.requireOver18 ? 'Yes' : 'No' },
     { label: 'Require Over 21', value: configData.ruleset?.requireOver21 ? 'Yes' : 'No' },
+    { label: 'Require Name Match', value: configData.ruleset?.requireNameMatch ? 'Yes' : 'No' },
     { label: 'Prevent Checkout During Manual Review', value: configData.manualReview?.blockCheckout ? 'Yes' : 'No' },
     { label: 'Manual Review Message', value: configData.manualReview?.message ? String(configData.manualReview.message) : '—' },
     { label: 'Button Text', value: configData.buttonText ?? '—' },
@@ -588,6 +589,18 @@ function EditForm({
             updateDraft({ ruleset: { ...ruleset, requireOver21: e.target.checked } })
           }
         />
+      </FormGroup>
+      <FormGroup>
+        <Checkbox
+          label="Require name match"
+          checked={!!ruleset.requireNameMatch}
+          onChange={(e) =>
+            updateDraft({ ruleset: { ...ruleset, requireNameMatch: e.target.checked } })
+          }
+        />
+        <Text color="secondary50" marginTop="xSmall">
+          Customer's shipping name must exactly match the name on the ID used for verification. When enabled, a notice is shown on the checkout page and checkout is blocked until the names match.
+        </Text>
       </FormGroup>
 
       <HR />

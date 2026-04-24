@@ -183,6 +183,23 @@ export async function updateTemplateIntegrationConfig(
   }
 }
 
+// ─── Name hash ────────────────────────────────────────────────────────────────
+
+export async function computeNameHash(
+  firstName: string,
+  lastName: string,
+  verificationId: string,
+): Promise<string> {
+  const normalized = (firstName + lastName + verificationId)
+    .replace(/[\s\-–—'`'",.]/g, '')
+    .toUpperCase();
+  const hashBuffer = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(normalized));
+  const hashHex = Array.from(new Uint8Array(hashBuffer))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+  return `SHA1:${hashHex}`;
+}
+
 // ─── Metafield payload builder ────────────────────────────────────────────────
 
 export function buildMetafieldPayload(
@@ -199,6 +216,7 @@ export function buildMetafieldPayload(
       over_18: result?.over_18 ?? null,
       over_21: result?.over_21 ?? null,
       face_match_score: result?.face_match_score ?? null,
+      blockchain_name: result?.blockchain_name ?? null,
     },
   };
   return {

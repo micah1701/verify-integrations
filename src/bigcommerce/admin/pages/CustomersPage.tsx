@@ -19,6 +19,7 @@ import {
   Small,
 } from '@bigcommerce/big-design';
 import { fetchCustomersList, fetchCustomerDetail } from '../api/bc-proxy.js';
+import { computeNameHash, getVerificationResult } from '../../../core/verify-api.js';
 import type {
   AdHocAdminConfig,
   EnrichedCustomer,
@@ -57,7 +58,7 @@ function VerificationBadge({ state }: { state: VerificationState }) {
   return <Badge label={label} variant={variant} />;
 }
 
-function MetafieldTable({ mf }: { mf: MetafieldValue }) {
+function MetafieldTable({ mf, nameMatch }: { mf: MetafieldValue; nameMatch?: boolean | null }) {
   const rows = [
     { field: 'Verification ID', value: mf.verificationId },
     { field: 'Status',          value: mf.status },
@@ -66,6 +67,7 @@ function MetafieldTable({ mf }: { mf: MetafieldValue }) {
     { field: 'Over 18',         value: String(mf.verification.over_18 ?? '—') },
     { field: 'Over 21',         value: String(mf.verification.over_21 ?? '—') },
     { field: 'Success',         value: String(mf.verification.success ?? '—') },
+    { field: 'Name Match',      value: nameMatch === true ? '✓ Match' : nameMatch === false ? '✗ Mismatch' : '—' },
   ];
   return (
     <Table
@@ -89,6 +91,7 @@ export default function CustomersPage({ config }: Props) {
   const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchId, setSearchId] = useState('');
+  const [nameMatch, setNameMatch] = useState<boolean | null>(null);
 
   // Load list whenever page/limit changes while in list view
   useEffect(() => {
@@ -108,6 +111,7 @@ export default function CustomersPage({ config }: Props) {
   async function openDetail(customerId: number) {
     setDetailLoading(true);
     setError(null);
+    setNameMatch(null);
     const data = await fetchCustomerDetail(config.storeHash, customerId);
     setDetailLoading(false);
     if (!data) {
@@ -116,6 +120,23 @@ export default function CustomersPage({ config }: Props) {
     }
     setDetailData(data);
     setView('detail');
+
+    const mf = data.metafield;
+    if (mf?.verificationId) {
+      let blockchainName = mf.verification.blockchain_name ?? null;
+      if (!blockchainName) {
+        const fresh = await getVerificationResult(config.apiBase, mf.verificationId);
+        blockchainName = fresh?.result?.blockchain_name ?? null;
+      }
+      if (blockchainName) {
+        const computed = await computeNameHash(
+          data.customer.first_name,
+          data.customer.last_name,
+          mf.verificationId,
+        );
+        setNameMatch(computed === blockchainName);
+      }
+    }
   }
 
   async function handleSearch(e: React.FormEvent) {
@@ -129,6 +150,7 @@ export default function CustomersPage({ config }: Props) {
     setView('list');
     setDetailData(null);
     setError(null);
+    setNameMatch(null);
   }
 
   // ── Detail View ──────────────────────────────────────────────────────────────
@@ -175,7 +197,7 @@ export default function CustomersPage({ config }: Props) {
             </Box>
           </Flex>
           {metafield ? (
-            <MetafieldTable mf={metafield} />
+            <MetafieldTable mf={metafield} nameMatch={nameMatch} />
           ) : (
             <Text>No Ad-Hoc Verify record found for this customer.</Text>
           )}
