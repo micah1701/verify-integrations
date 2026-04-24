@@ -139,6 +139,10 @@ const SESSION_KEY = `adhoc_verify_pending_${config.integrationKey}`;
 // metafield on the order confirmation page.
 const COMPLETED_KEY = `adhoc_verify_done_${config.integrationKey}`;
 
+// Cart ID persisted here so the order-confirmation page can resolve the order ID via the
+// Storefront Checkouts API (cart ID == checkout ID in BigCommerce).
+const CART_ID_KEY = `adhoc_verify_cartid_${config.integrationKey}`;
+
 // ─── 4. Order Confirmation Handler ───────────────────────────────────────────
 
 async function handleOrderConfirmationPage(): Promise<void> {
@@ -169,6 +173,9 @@ async function handleOrderConfirmationPage(): Promise<void> {
     return;
   }
 
+  // BCData.order_id is empty for guest checkouts and the URL has no order ID in the path.
+  // Cart ID == Checkout ID in BigCommerce, so call the Storefront Checkouts API with the
+  // cart ID we persisted during the previous checkout steps to get the completed orderId.
   const bcData = (window as Window & { BCData?: { order_id?: number } }).BCData;
   let orderId: string | null =
     bcData?.order_id?.toString() ??
@@ -176,21 +183,23 @@ async function handleOrderConfirmationPage(): Promise<void> {
     null;
 
   if (!orderId) {
-    // BCData is empty for guest checkouts and the URL has no order ID — fall back to the
-    // BC Storefront Orders API, which BC's own confirmation page calls and works for guests.
-    log('Order confirmation: BCData and URL both lack order ID — querying /api/storefront/orders.');
-    try {
-      const res = await fetch('/api/storefront/orders?limit=1', { credentials: 'same-origin' });
-      if (res.ok) {
-        const orders = await res.json() as Array<{ id?: number }>;
-        const id = orders?.[0]?.id;
-        if (id) {
-          orderId = String(id);
-          log(`Order confirmation: resolved orderId="${orderId}" from storefront orders API.`);
+    const cartId = sessionStorage.getItem(CART_ID_KEY);
+    if (cartId) {
+      log(`Order confirmation: querying /api/storefront/checkouts/${cartId} to resolve orderId.`);
+      try {
+        const res = await fetch(`/api/storefront/checkouts/${cartId}`, { credentials: 'same-origin' });
+        if (res.ok) {
+          const checkout = await res.json() as { orderId?: number };
+          if (checkout?.orderId) {
+            orderId = String(checkout.orderId);
+            log(`Order confirmation: resolved orderId="${orderId}" from checkouts API.`);
+          }
         }
+      } catch (_) {
+        log('Order confirmation: checkouts API request failed.');
       }
-    } catch (_) {
-      log('Order confirmation: storefront orders API request failed.');
+    } else {
+      log('Order confirmation: no cart ID in sessionStorage — cannot resolve order ID.');
     }
   }
 
@@ -556,6 +565,7 @@ async function init(): Promise<void> {
 
   _cartId = cart.cartId;
   _customerId = cart.customerId;
+  sessionStorage.setItem(CART_ID_KEY, _cartId);
   log(`Cart loaded: cartId="${_cartId}", customerId=${_customerId}, loggedIn=${_customerId !== 0}, productIds=[${(cart.productIds ?? []).join(', ')}]`);
 
   // Trigger rule: hide the widget entirely if this cart doesn't qualify
