@@ -143,6 +143,11 @@ const COMPLETED_KEY = `adhoc_verify_done_${config.integrationKey}`;
 // Storefront Checkouts API (cart ID == checkout ID in BigCommerce).
 const CART_ID_KEY = `adhoc_verify_cartid_${config.integrationKey}`;
 
+// Order ID captured by intercepting POST /api/storefront/checkouts/{id}/orders on the checkout
+// page. More reliable than querying the checkouts API on the confirmation page, which returns
+// 401 for guests because the checkout record is deleted once the order is placed.
+const ORDER_ID_KEY = `adhoc_verify_orderid_${config.integrationKey}`;
+
 // ─── 4. Order Confirmation Handler ───────────────────────────────────────────
 
 async function handleOrderConfirmationPage(): Promise<void> {
@@ -174,33 +179,21 @@ async function handleOrderConfirmationPage(): Promise<void> {
   }
 
   // BCData.order_id is empty for guest checkouts and the URL has no order ID in the path.
-  // Cart ID == Checkout ID in BigCommerce, so call the Storefront Checkouts API with the
-  // cart ID we persisted during the previous checkout steps to get the completed orderId.
+  // Primary: use the order ID captured by our fetch interceptor when the order was submitted
+  // (POST /api/storefront/checkouts/{id}/orders). The checkouts API is not a reliable fallback
+  // for guests because the checkout record is deleted once the order is placed.
   const bcData = (window as Window & { BCData?: { order_id?: number } }).BCData;
   let orderId: string | null =
     bcData?.order_id?.toString() ??
     window.location.pathname.match(/\/order-confirmation\/(\d+)/)?.[1] ??
+    sessionStorage.getItem(ORDER_ID_KEY) ??
     null;
 
-  if (!orderId) {
-    const cartId = sessionStorage.getItem(CART_ID_KEY);
-    if (cartId) {
-      log(`Order confirmation: querying /api/storefront/checkouts/${cartId} to resolve orderId.`);
-      try {
-        const res = await fetch(`/api/storefront/checkouts/${cartId}`, { credentials: 'same-origin' });
-        if (res.ok) {
-          const checkout = await res.json() as { orderId?: number };
-          if (checkout?.orderId) {
-            orderId = String(checkout.orderId);
-            log(`Order confirmation: resolved orderId="${orderId}" from checkouts API.`);
-          }
-        }
-      } catch (_) {
-        log('Order confirmation: checkouts API request failed.');
-      }
-    } else {
-      log('Order confirmation: no cart ID in sessionStorage — cannot resolve order ID.');
-    }
+  if (orderId) {
+    log(`Order confirmation: resolved orderId="${orderId}".`);
+  } else {
+    log('Order confirmation: could not determine order ID — skipping metafield write.');
+    return;
   }
 
   if (!orderId) {
@@ -1025,7 +1018,39 @@ async function applyRemoteConfig(remote: IntegrationConfig): Promise<void> {
   log('Remote config applied. Final config:', config);
 }
 
+// Intercept the BC checkout order-creation call to capture the order ID before the cart/checkout
+// record is deleted. Must be installed early — before the user submits the order form.
+function installOrderIdCapture(): void {
+  log('Installing fetch interceptor to capture order ID at checkout submission.');
+  const originalFetch = window.fetch.bind(window);
+  window.fetch = async function (input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+    const response = await originalFetch(input, init);
+
+    const url =
+      typeof input === 'string' ? input
+      : input instanceof URL ? input.href
+      : (input as Request).url;
+    const method = (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase();
+
+    if (method === 'POST' && /\/api\/storefront\/checkouts\/[^/]+\/orders/.test(url)) {
+      try {
+        const data = await response.clone().json() as { id?: number; orderId?: number };
+        const orderId = data.id ?? data.orderId;
+        if (orderId) {
+          sessionStorage.setItem(ORDER_ID_KEY, String(orderId));
+          log(`Order ID captured from checkout submission: orderId="${orderId}"`);
+        }
+      } catch (_) {
+        log('Could not parse order creation response — order ID not captured.');
+      }
+    }
+
+    return response;
+  };
+}
+
 async function bootstrap(): Promise<void> {
+  if (isCheckout) installOrderIdCapture();
   if (userConfig.templateId) {
     log(`templateId="${userConfig.templateId}" found — fetching remote integration_config from API.`);
     const remote = await getTemplateIntegrationConfig(
