@@ -1,31 +1,31 @@
 # Upstream API: Ad-Hoc Verify
 
-`INTEGRATION.md` at the repo root is the **source of truth** for the upstream API. This file is a map of what *this repo* uses and the gotchas. Base URL default: `https://verify-api.ad-hoc.app` (override with `apiBase` in the storefront config / `ADHOC_API_BASE` on the server).
+`INTEGRATION.md` at the repo root is the **source of truth** for the upstream API. This file is a map of what _this repo_ uses and the gotchas. Base URL default: `https://verify-api.ad-hoc.app` (override with `apiBase` in the storefront config / `ADHOC_API_BASE` on the server).
 
 The platform itself is developed in a different repo (`micah1701/verify`). If an endpoint here seems wrong, check that repo's `.ai/backend/rest-api.md` and `.ai/backend/edge-functions.md` rather than guessing.
 
 ## Two auth modes
 
-| | Integration Key | REST API (Bearer) |
-|---|---|---|
-| Header | `X-API-Key: ahv_pub_…` | `Authorization: Bearer <token>` |
-| Where | Browser / storefront | Server or merchant-authenticated admin session |
-| Restricted by | Domain allowlist (Profile in dashboard) — unlisted origins get `403` | Email + password login |
-| Can read full results | No | Yes |
+|                       | Integration Key                                                      | REST API (Bearer)                              |
+| --------------------- | -------------------------------------------------------------------- | ---------------------------------------------- |
+| Header                | `X-API-Key: ahv_pub_…`                                               | `Authorization: Bearer <token>`                |
+| Where                 | Browser / storefront                                                 | Server or merchant-authenticated admin session |
+| Restricted by         | Domain allowlist (Profile in dashboard) — unlisted origins get `403` | Email + password login                         |
+| Can read full results | No                                                                   | Yes                                            |
 
 ## Endpoints used by this repo
 
-| Endpoint | Auth | Used by | Purpose |
-|---|---|---|---|
-| `POST /create-verification` | Integration Key | storefront | Create a verification (`{template_id?}`) → `{id, url, created_at}` |
-| `GET /get-verification-result?id=` | none | storefront modal polling, admin detail | `{status, result?, completed_at?}`; `result` is `VerificationOutcome` (safe fields only) |
-| `GET /get-template-config?template_id=` | Integration Key | storefront boot, admin | Returns the template's `integration_config` |
-| `PATCH /api/templates/:id` | Bearer | admin Integration Config tab | Body `{integration_config: {...}}` |
-| `POST /api/auth` | — | admin | `{email,password}` → `{access_token, refresh_token?, expires_in}` |
-| `POST /api/auth/refresh` | — | admin | `{refresh_token}` → new tokens |
-| `POST /bc-metafields` | none (BC token in body) | storefront | BC metafield proxy — **this repo owns it** (`supabase/functions/bc-metafields/`), BigCommerce-specific, see [`../integrations/bigcommerce/metafields.md`](../integrations/bigcommerce/metafields.md) |
+| Endpoint                                | Auth                    | Used by                                | Purpose                                                                                                                                                                                              |
+| --------------------------------------- | ----------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /create-verification`             | Integration Key         | storefront                             | Create a verification (`{template_id?}`) → `{id, url, created_at}`                                                                                                                                   |
+| `GET /get-verification-result?id=`      | none                    | storefront modal polling, admin detail | `{status, result?, completed_at?}`; `result` is `VerificationOutcome` (safe fields only)                                                                                                             |
+| `GET /get-template-config?template_id=` | Integration Key         | storefront boot, admin                 | Returns the template's `integration_config`                                                                                                                                                          |
+| `PATCH /api/templates/:id`              | Bearer                  | admin Integration Config tab           | Body `{integration_config: {...}}`                                                                                                                                                                   |
+| `POST /api/auth`                        | —                       | admin                                  | `{email,password}` → `{access_token, refresh_token?, expires_in}`                                                                                                                                    |
+| `POST /api/auth/refresh`                | —                       | admin                                  | `{refresh_token}` → new tokens                                                                                                                                                                       |
+| `POST /bc-metafields`                   | none (BC token in body) | storefront                             | BC metafield proxy — **this repo owns it** (`supabase/functions/bc-metafields/`), BigCommerce-specific, see [`../integrations/bigcommerce/metafields.md`](../integrations/bigcommerce/metafields.md) |
 
-Verification URL shown to shoppers: `${verifyBase}/verify/${id}` (default `verifyBase = https://verify.ad-hoc.app`). The end-user page posts `{type:'adhoc-verify-complete', verificationId}` to its parent window when finished.
+Verification URL shown to shoppers: `${verifyBase}/verify/${id}` (default `verifyBase = https://adhocverify.com`). The end-user page posts `{type:'adhoc-verify-complete', verificationId}` to its parent window when finished.
 
 ## Status values (poll result)
 
@@ -33,7 +33,7 @@ Verification URL shown to shoppers: `${verifyBase}/verify/${id}` (default `verif
 
 ## `face_match_score`
 
-`definite_match`, `likely_match`, `possible_match`, `no_match`. Ordered strongest→weakest; the rule `minFaceMatchScore` rejects anything *weaker* than the minimum.
+`definite_match`, `likely_match`, `possible_match`, `no_match`. Ordered strongest→weakest; the rule `minFaceMatchScore` rejects anything _weaker_ than the minimum.
 
 ## Other facts worth knowing
 

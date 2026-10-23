@@ -69,7 +69,7 @@ data/
 ### Prerequisites
 
 - Node.js 18+
-- An [Ad-Hoc Verify](https://verify.ad-hoc.app) account with an active integration
+- An [Ad-Hoc Verify](https://adhocverify.com) account with an active integration
 - A BigCommerce store or sandbox for testing
 - A public URL for the server during development — use [ngrok](https://ngrok.com) or [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/) to expose localhost
 
@@ -87,12 +87,12 @@ cp .env.example .env
 
 Edit `.env` and fill in:
 
-| Variable | Where to get it |
-|---|---|
-| `BC_CLIENT_ID` | BigCommerce Developer Portal → your app |
-| `BC_CLIENT_SECRET` | BigCommerce Developer Portal → your app |
-| `APP_BASE_URL` | Your server's public URL (ngrok URL for local dev) |
-| `ADHOC_API_BASE` | `https://verify-api.ad-hoc.app` (default) |
+| Variable           | Where to get it                                    |
+| ------------------ | -------------------------------------------------- |
+| `BC_CLIENT_ID`     | BigCommerce Developer Portal → your app            |
+| `BC_CLIENT_SECRET` | BigCommerce Developer Portal → your app            |
+| `APP_BASE_URL`     | Your server's public URL (ngrok URL for local dev) |
+| `ADHOC_API_BASE`   | `https://verify-api.ad-hoc.app` (default)          |
 
 ### Build & Run
 
@@ -243,7 +243,7 @@ Click the installation link (or find it in the BC App Marketplace). Authorize th
 
 ### Step 2 — Set Up an Ad-Hoc Verify Integration Key and Template
 
-1. Sign up at [Ad-Hoc Verify](https://verify.ad-hoc.app)
+1. Sign up at [Ad-Hoc Verify](https://adhocverify.com)
 2. Create an integration and copy your **Integration Key** (`ahv_pub_...`)
 3. Add your store's domain to the Integration Key allowlist (e.g., `yourstore.mybigcommerce.com`)
 4. Create a **verification template** in the dashboard and note its UUID
@@ -274,7 +274,7 @@ Paste the following, replacing the placeholder values:
 <script>
   window.AdHocVerifyConfig = {
     integrationKey: "ahv_pub_...",
-    templateId:     "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    templateId: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
   };
 </script>
 <script src="https://verify-integrations.ad-hoc.app/storefront/bigcommerce.js"></script>
@@ -303,23 +303,23 @@ All options are set via `window.AdHocVerifyConfig` in the Script Manager snippet
 
 The recommended approach is to keep the script tag minimal and manage all store-specific settings through the **Integration Config** tab in the admin panel.
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `integrationKey` | `string` | **Required** | Ad-Hoc Verify integration key (`ahv_pub_...`) |
-| `templateId` | `string` | Recommended | Template UUID — all other config is fetched from this template's `integration_config` |
-| `storeHash` | `string` | From template | BC store hash — set via Integration Config tab, not the script tag |
-| `storeAccessToken` | `string` | From template | BC store-level API access token — set via Integration Config tab |
-| `pages` | `string[]` | `['cart', 'checkout']` | Pages to activate: `'cart'`, `'checkout'`, `'order-confirmation'`. **Must be set here in the script tag** — the plugin evaluates this synchronously at load time, before any remote config is fetched, so values stored in the template have no effect. |
-| `ruleset.requireVerification` | `boolean` | `true` | Disable checkout until verified |
-| `ruleset.minFaceMatchScore` | `string\|null` | `null` | Minimum face match tier: `'definite_match'`, `'likely_match'`, `'possible_match'` |
-| `ruleset.requireOver18` | `boolean` | `false` | Fail if `over_18` is false |
-| `ruleset.requireOver21` | `boolean` | `false` | Fail if `over_21` is false |
-| `manualReview.blockCheckout` | `boolean` | `false` | Block checkout during manual review |
-| `manualReview.message` | `string\|null` | Default message | Message shown during manual review; `null` hides it |
-| `buttonText` | `string` | `'Verify ID'` | Verify button label |
-| `selector` | `string` | `'.cart-actions'` | CSS selector for the UI injection point |
-| `onComplete` | `function(id)` | — | Callback with verification ID on completion |
-| `onResult` | `function(result)` | — | Callback with `{ verificationId, success, over_18, over_21, face_match_score }` |
+| Option                        | Type               | Default                | Description                                                                                                                                                                                                                                             |
+| ----------------------------- | ------------------ | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `integrationKey`              | `string`           | **Required**           | Ad-Hoc Verify integration key (`ahv_pub_...`)                                                                                                                                                                                                           |
+| `templateId`                  | `string`           | Recommended            | Template UUID — all other config is fetched from this template's `integration_config`                                                                                                                                                                   |
+| `storeHash`                   | `string`           | From template          | BC store hash — set via Integration Config tab, not the script tag                                                                                                                                                                                      |
+| `storeAccessToken`            | `string`           | From template          | BC store-level API access token — set via Integration Config tab                                                                                                                                                                                        |
+| `pages`                       | `string[]`         | `['cart', 'checkout']` | Pages to activate: `'cart'`, `'checkout'`, `'order-confirmation'`. **Must be set here in the script tag** — the plugin evaluates this synchronously at load time, before any remote config is fetched, so values stored in the template have no effect. |
+| `ruleset.requireVerification` | `boolean`          | `true`                 | Disable checkout until verified                                                                                                                                                                                                                         |
+| `ruleset.minFaceMatchScore`   | `string\|null`     | `null`                 | Minimum face match tier: `'definite_match'`, `'likely_match'`, `'possible_match'`                                                                                                                                                                       |
+| `ruleset.requireOver18`       | `boolean`          | `false`                | Fail if `over_18` is false                                                                                                                                                                                                                              |
+| `ruleset.requireOver21`       | `boolean`          | `false`                | Fail if `over_21` is false                                                                                                                                                                                                                              |
+| `manualReview.blockCheckout`  | `boolean`          | `false`                | Block checkout during manual review                                                                                                                                                                                                                     |
+| `manualReview.message`        | `string\|null`     | Default message        | Message shown during manual review; `null` hides it                                                                                                                                                                                                     |
+| `buttonText`                  | `string`           | `'Verify ID'`          | Verify button label                                                                                                                                                                                                                                     |
+| `selector`                    | `string`           | `'.cart-actions'`      | CSS selector for the UI injection point                                                                                                                                                                                                                 |
+| `onComplete`                  | `function(id)`     | —                      | Callback with verification ID on completion                                                                                                                                                                                                             |
+| `onResult`                    | `function(result)` | —                      | Callback with `{ verificationId, success, over_18, over_21, face_match_score }`                                                                                                                                                                         |
 
 ---
 

@@ -2,7 +2,7 @@
 
 > For AI agents and developers building third-party integrations against the Ad-Hoc Verify platform.
 
-**Live platform:** https://verify.ad-hoc.app
+**Live platform:** https://adhocverify.com
 **API base URL:** https://verify-api.ad-hoc.app
 
 ---
@@ -17,13 +17,13 @@ All face detection runs **client-side in the browser**. No raw images leave the 
 
 ## Two Integration Methods
 
-| | REST API | Integration Key |
-|---|---|---|
-| **Auth** | Email + password → Bearer token | `X-API-Key: ahv_pub_...` header |
-| **Where it lives** | Server environment / secrets manager | Client-side JavaScript (safe to expose) |
-| **Use case** | Backend creates + reads verifications | Storefront plugins, browser scripts |
-| **Can read results** | Yes | No — results via webhook or REST API |
-| **Domain restriction** | No | Yes (required — configure in Profile) |
+|                        | REST API                              | Integration Key                         |
+| ---------------------- | ------------------------------------- | --------------------------------------- |
+| **Auth**               | Email + password → Bearer token       | `X-API-Key: ahv_pub_...` header         |
+| **Where it lives**     | Server environment / secrets manager  | Client-side JavaScript (safe to expose) |
+| **Use case**           | Backend creates + reads verifications | Storefront plugins, browser scripts     |
+| **Can read results**   | Yes                                   | No — results via webhook or REST API    |
+| **Domain restriction** | No                                    | Yes (required — configure in Profile)   |
 
 ---
 
@@ -39,6 +39,7 @@ Content-Type: application/json
 ```
 
 Response:
+
 ```json
 { "access_token": "eyJ...", "expires_in": 3600 }
 ```
@@ -64,10 +65,11 @@ Content-Type: application/json
 ```
 
 Response `201`:
+
 ```json
 {
   "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-  "url": "https://verify.ad-hoc.app/verify/f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "url": "https://adhocverify.com/verify/f47ac10b-58cc-4372-a567-0e02b2c3d479",
   "created_at": "2026-03-31T12:00:00.000Z"
 }
 ```
@@ -82,6 +84,7 @@ Authorization: Bearer <token>
 ```
 
 Response when completed:
+
 ```json
 {
   "id": "f47ac10b-...",
@@ -101,14 +104,14 @@ Status values: `pending` → `started` → `completed` / `manual_review` / `expi
 An integration key (`ahv_pub_...`) is a publishable key generated from **Profile → Integration Key** in the dashboard. It can only call `POST /verification` and is restricted to domains you allowlist.
 
 ```js
-fetch('https://verify-api.ad-hoc.app/create-verification', {
-  method: 'POST',
+fetch("https://verify-api.ad-hoc.app/create-verification", {
+  method: "POST",
   headers: {
-    'Content-Type': 'application/json',
-    'X-API-Key': 'ahv_pub_...',
+    "Content-Type": "application/json",
+    "X-API-Key": "ahv_pub_...",
   },
-  body: JSON.stringify({ template_id: 'uuid' }),
-})
+  body: JSON.stringify({ template_id: "uuid" }),
+});
 ```
 
 Response is the same `{ id, url }` shape as the REST API.
@@ -144,12 +147,12 @@ When verification completes, the configured `webhook_url` receives a `POST` with
 
 ### `face_match_score` Values
 
-| Value | Meaning |
-|---|---|
+| Value            | Meaning                                            |
+| ---------------- | -------------------------------------------------- |
 | `definite_match` | Strong match on all signals (composite score ≥ 75) |
-| `likely_match` | Passes primary Euclidean threshold (≥ 55) |
+| `likely_match`   | Passes primary Euclidean threshold (≥ 55)          |
 | `possible_match` | Borderline — cosine rescue may have applied (≥ 40) |
-| `no_match` | No meaningful similarity (< 40) |
+| `no_match`       | No meaningful similarity (< 40)                    |
 
 `webcam_face_matches_license_photo` is the boolean authority. `face_match_score` gives the confidence tier. Use both when making authorization decisions.
 
@@ -174,6 +177,7 @@ GET https://verify-api.ad-hoc.app/get-verification-result?id=f47ac10b-...
 ```
 
 Response:
+
 ```json
 {
   "status": "completed",
@@ -190,9 +194,10 @@ Response:
 Note: `get-verification-result` returns only safe public-facing outcome fields (no PII). Retrieve full results including `license_data` using the REST API with a Bearer token.
 
 The verification iframe also fires a `postMessage` to the parent window on completion:
+
 ```js
-window.addEventListener('message', (e) => {
-  if (e.data?.type === 'adhoc-verify-complete') {
+window.addEventListener("message", (e) => {
+  if (e.data?.type === "adhoc-verify-complete") {
     const { verificationId } = e.data;
     // poll get-verification-result or fetch from your server
   }
@@ -212,6 +217,7 @@ A ready-made plugin (`static/plugin/bigcommerce.js`) is available for BigCommerc
 **2. Create a verification template** in the Ad-Hoc Verify dashboard. Note the template UUID.
 
 **3. Configure the template's store credentials** via the **Integration Config** tab in the BC admin app (Apps → Ad-Hoc Verify → Integration Config). Enter your Integration Key and Template ID, load the config, then click Edit (requires your Ad-Hoc Verify credentials) and fill in:
+
 - **Store Hash** — from your BC store URL
 - **Store Access Token** — from a BC store-level API account (Settings → Store-level API accounts; required scopes: Carts read/write, Customers read/write)
 - **Pages**, **Ruleset**, and any other UI settings
@@ -221,8 +227,8 @@ A ready-made plugin (`static/plugin/bigcommerce.js`) is available for BigCommerc
 ```html
 <script>
   window.AdHocVerifyConfig = {
-    integrationKey: 'ahv_pub_...',              // Your Ad-Hoc Verify integration key
-    templateId:     'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',  // Your template UUID
+    integrationKey: "ahv_pub_...", // Your Ad-Hoc Verify integration key
+    templateId: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", // Your template UUID
   };
 </script>
 <script src="https://verify-integrations.ad-hoc.app/storefront/bigcommerce.js"></script>
@@ -268,25 +274,25 @@ Saved to cart metafields for guests; also to customer metafields for logged-in c
 
 When `templateId` is set, the plugin fetches `integration_config` from the template at boot and uses those values as defaults. Anything set in `window.AdHocVerifyConfig` takes precedence over the template config.
 
-| Option | Type | Required | Description |
-|---|---|---|---|
-| `integrationKey` | string | **Yes** | Integration key (`ahv_pub_...`) |
-| `templateId` | UUID string | Recommended | Template whose `integration_config` is fetched at boot to supply all other settings |
-| `storeHash` | string | For metafields | BC store hash — usually stored in `integration_config`, not the script tag |
-| `storeAccessToken` | string | For metafields | BC store-level API access token — usually stored in `integration_config` |
-| `pages` | string[] | No | Pages to activate: `'cart'`, `'checkout'`, `'order-confirmation'` (default: `['cart']`) |
-| `ruleset.requireVerification` | boolean | No | Disable checkout button until verified (default: `true`) |
-| `ruleset.minFaceMatchScore` | string\|null | No | Minimum acceptable face match tier: `'definite_match'`, `'likely_match'`, `'possible_match'`, or `null` |
-| `ruleset.requireOver18` | boolean | No | Fail verification if `over_18` is false |
-| `ruleset.requireOver21` | boolean | No | Fail verification if `over_21` is false |
-| `manualReview.blockCheckout` | boolean | No | Block checkout while verification is pending manual review (default: `false`) |
-| `manualReview.message` | string\|null | No | Message shown during manual review; `null` hides it |
-| `buttonText` | string | No | Button label (default: `'Verify ID'`) |
-| `selector` | CSS selector | No | Where to inject the UI (default: `.cart-actions`) |
-| `apiBase` | string | No | Ad-Hoc Verify API base URL (default: `https://verify-api.ad-hoc.app`) |
-| `verifyBase` | string | No | Ad-Hoc Verify app base URL (default: `https://verify.ad-hoc.app`) |
-| `onComplete` | function(id) | No | Callback with verification ID on completion |
-| `onResult` | function(result) | No | Callback with `{ verificationId, success, over_18, over_21, face_match_score }` |
+| Option                        | Type             | Required       | Description                                                                                             |
+| ----------------------------- | ---------------- | -------------- | ------------------------------------------------------------------------------------------------------- |
+| `integrationKey`              | string           | **Yes**        | Integration key (`ahv_pub_...`)                                                                         |
+| `templateId`                  | UUID string      | Recommended    | Template whose `integration_config` is fetched at boot to supply all other settings                     |
+| `storeHash`                   | string           | For metafields | BC store hash — usually stored in `integration_config`, not the script tag                              |
+| `storeAccessToken`            | string           | For metafields | BC store-level API access token — usually stored in `integration_config`                                |
+| `pages`                       | string[]         | No             | Pages to activate: `'cart'`, `'checkout'`, `'order-confirmation'` (default: `['cart']`)                 |
+| `ruleset.requireVerification` | boolean          | No             | Disable checkout button until verified (default: `true`)                                                |
+| `ruleset.minFaceMatchScore`   | string\|null     | No             | Minimum acceptable face match tier: `'definite_match'`, `'likely_match'`, `'possible_match'`, or `null` |
+| `ruleset.requireOver18`       | boolean          | No             | Fail verification if `over_18` is false                                                                 |
+| `ruleset.requireOver21`       | boolean          | No             | Fail verification if `over_21` is false                                                                 |
+| `manualReview.blockCheckout`  | boolean          | No             | Block checkout while verification is pending manual review (default: `false`)                           |
+| `manualReview.message`        | string\|null     | No             | Message shown during manual review; `null` hides it                                                     |
+| `buttonText`                  | string           | No             | Button label (default: `'Verify ID'`)                                                                   |
+| `selector`                    | CSS selector     | No             | Where to inject the UI (default: `.cart-actions`)                                                       |
+| `apiBase`                     | string           | No             | Ad-Hoc Verify API base URL (default: `https://verify-api.ad-hoc.app`)                                   |
+| `verifyBase`                  | string           | No             | Ad-Hoc Verify app base URL (default: `https://adhocverify.com`)                                         |
+| `onComplete`                  | function(id)     | No             | Callback with verification ID on completion                                                             |
+| `onResult`                    | function(result) | No             | Callback with `{ verificationId, success, over_18, over_21, face_match_score }`                         |
 
 ### Integration Config (Template-Driven Configuration)
 
@@ -329,10 +335,10 @@ Enable `include_license_photo: true` to include a cropped face photo from the dr
 
 Three modes for handling PII:
 
-| Mode | Behavior |
-|---|---|
-| `none` | Plaintext PII in results (default) |
-| `shared` | Platform-managed key — viewable in dashboard, auto-purged after 30 days |
+| Mode     | Behavior                                                                       |
+| -------- | ------------------------------------------------------------------------------ |
+| `none`   | Plaintext PII in results (default)                                             |
+| `shared` | Platform-managed key — viewable in dashboard, auto-purged after 30 days        |
 | `custom` | Client's RSA public key — only client can decrypt; server never sees plaintext |
 
 Encrypted PII is delivered as an `EncryptedEnvelope` (`{ v, alg, encrypted_key, iv, ciphertext }`) in place of the `license_data` object. Decrypt with: unwrap the AES-256 key using your RSA private key (RSA-OAEP), then decrypt `ciphertext` with AES-256-GCM using the `iv`.
@@ -359,11 +365,11 @@ If the face match fails, the end user can optionally request **manual review** (
 
 ## API Rate Limits
 
-| Action | Limit |
-|---|---|
-| `POST /api/auth` | 5 requests / minute / email |
-| `POST /api/verification` | 100 requests / hour |
-| `GET /api/verification` | 300 requests / hour |
+| Action                                  | Limit                        |
+| --------------------------------------- | ---------------------------- |
+| `POST /api/auth`                        | 5 requests / minute / email  |
+| `POST /api/verification`                | 100 requests / hour          |
+| `GET /api/verification`                 | 300 requests / hour          |
 | Integration key (`create-verification`) | 30 requests / hour (default) |
 
 ---
@@ -371,6 +377,7 @@ If the face match fails, the end user can optionally request **manual review** (
 ## Error Format
 
 All errors return:
+
 ```json
 { "error": "Human-readable description", "code": "MACHINE_READABLE_CODE" }
 ```
@@ -381,15 +388,15 @@ Common codes: `MISSING_AUTH`, `UNAUTHORIZED`, `VALIDATION_ERROR`, `NOT_FOUND`, `
 
 ## Key Endpoints Summary
 
-| Endpoint | Auth | Purpose |
-|---|---|---|
-| `POST /api/auth` | Public | Get Bearer token |
-| `POST /api/verification` | Bearer token | Create verification (REST API) |
-| `GET /api/verification?id=...` | Bearer token | Get status + full results |
-| `POST /create-verification` | `X-API-Key` | Create verification (integration key) |
-| `GET /get-verification-result?id=...` | Public | Poll status + safe outcome fields |
-| `GET /get-template-config?template_id=...` | `X-API-Key` | Fetch `integration_config` from a template |
-| `PATCH /api/templates/:id` | Bearer token | Update template fields including `integration_config` |
-| `POST /bc-metafields` | Public (passes storeAccessToken in body) | BC metafields proxy — read/write cart or customer metafields |
-| `POST /retry-webhook` | Bearer token | Retry a failed webhook delivery |
-| `POST /purge-pii` | Bearer token | Delete stored PII and face images |
+| Endpoint                                   | Auth                                     | Purpose                                                      |
+| ------------------------------------------ | ---------------------------------------- | ------------------------------------------------------------ |
+| `POST /api/auth`                           | Public                                   | Get Bearer token                                             |
+| `POST /api/verification`                   | Bearer token                             | Create verification (REST API)                               |
+| `GET /api/verification?id=...`             | Bearer token                             | Get status + full results                                    |
+| `POST /create-verification`                | `X-API-Key`                              | Create verification (integration key)                        |
+| `GET /get-verification-result?id=...`      | Public                                   | Poll status + safe outcome fields                            |
+| `GET /get-template-config?template_id=...` | `X-API-Key`                              | Fetch `integration_config` from a template                   |
+| `PATCH /api/templates/:id`                 | Bearer token                             | Update template fields including `integration_config`        |
+| `POST /bc-metafields`                      | Public (passes storeAccessToken in body) | BC metafields proxy — read/write cart or customer metafields |
+| `POST /retry-webhook`                      | Bearer token                             | Retry a failed webhook delivery                              |
+| `POST /purge-pii`                          | Bearer token                             | Delete stored PII and face images                            |
