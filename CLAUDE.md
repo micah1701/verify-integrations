@@ -1,5 +1,13 @@
 # CLAUDE.md — Ad-Hoc Verify Integration Platform
 
+**Start here:** read [`.ai/README.md`](.ai/README.md) — a navigable index of the project docs. `.ai/global/` applies to every integration; `.ai/integrations/<platform>/` holds platform-specific docs (today: `bigcommerce/`); `.ai/skills/` has step-by-step recipes. Open the file relevant to your task instead of re-deriving it from source. Update the matching `.ai/` file in the same change as the code, and check [`.ai/global/known-issues.md`](.ai/global/known-issues.md) before assuming something is a new bug.
+
+| Area | Files |
+|---|---|
+| **global/** | [project-overview](.ai/global/project-overview.md) · [architecture](.ai/global/architecture.md) · [core-library](.ai/global/core-library.md) · [adhoc-verify-api](.ai/global/adhoc-verify-api.md) · [rules](.ai/global/rules.md) · [tech-stack](.ai/global/tech-stack.md) · [design-decisions](.ai/global/design-decisions.md) · [deployment](.ai/global/deployment.md) · [known-issues](.ai/global/known-issues.md) |
+| **integrations/bigcommerce/** | [overview](.ai/integrations/bigcommerce/overview.md) · [server](.ai/integrations/bigcommerce/server.md) · [storefront](.ai/integrations/bigcommerce/storefront.md) · [checkout-enforcement](.ai/integrations/bigcommerce/checkout-enforcement.md) · [metafields](.ai/integrations/bigcommerce/metafields.md) · [admin-spa](.ai/integrations/bigcommerce/admin-spa.md) · [config-reference](.ai/integrations/bigcommerce/config-reference.md) |
+| **skills/** | [add-integration](.ai/skills/add-integration.md) · [add-config-option](.ai/skills/add-config-option.md) · [add-admin-endpoint](.ai/skills/add-admin-endpoint.md) · [change-metafield-shape](.ai/skills/change-metafield-shape.md) · [debug-storefront](.ai/skills/debug-storefront.md) · [deploy](.ai/skills/deploy.md) |
+
 ## What This Is
 
 A multi-integration identity verification platform built on the Ad-Hoc Verify service. It allows e-commerce merchants to require customers to verify their identity (driver's license + liveness selfie) before completing a checkout. BigCommerce is the first supported platform; the architecture is designed to add others (Shopify, WooCommerce, etc.) without restructuring.
@@ -40,7 +48,8 @@ src/bigcommerce/storefront/      # Svelte + TypeScript → compiled IIFE
 
 src/bigcommerce/admin/           # React 18 + BigDesign
   App.tsx                        # Tabbed layout — reads window.AdHocAdminConfig
-  pages/                         # CustomerVerificationPage, OrderVerificationPage, IntegrationConfigPage
+  api/bc-proxy.ts                # Same-origin calls to /bigcommerce/api/*
+  pages/                         # CustomersPage, OrdersPage, IntegrationConfigPage
 
 server/                          # Node.js/Express backend
   index.ts                       # Entry point (HTTP server, dotenv, graceful shutdown)
@@ -54,6 +63,7 @@ server/                          # Node.js/Express backend
     auth.ts                      # GET /bigcommerce/auth — OAuth install callback
     load.ts                      # GET /bigcommerce/load — JWT verify + config injection into SPA
     uninstall.ts                 # GET /bigcommerce/uninstall — JWT verify + delete token
+    proxy.ts                     # GET /bigcommerce/api/{customers,orders}[/:id] — BC Management API reads for the admin SPA
     render-error.ts              # Shared HTML error page (BC shows these in an iframe)
 ```
 
@@ -67,6 +77,8 @@ The server runs at `https://verify-integrations.ad-hoc.app`. Integration routes 
 | `GET /bigcommerce/auth` | OAuth install — exchange code for access token |
 | `GET /bigcommerce/load` | Load app — verify JWT, inject config, serve admin SPA |
 | `GET /bigcommerce/uninstall` | Uninstall — delete stored token |
+| `GET /bigcommerce/api/*` | Management API proxy for the admin SPA (customers, orders) |
+| `GET /bigcommerce/storefront/*` | Static serving of `dist/storefront/` (the IIFE bundle) |
 | `GET /bigcommerce/admin/*` | Static serving of `dist/admin/` |
 
 To add a new integration: create `server/shopify/router.ts` + handlers and add `app.use('/shopify', shopifyRouter)` in `server/core/app.ts`. Nothing else changes.
