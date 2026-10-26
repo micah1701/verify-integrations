@@ -22,6 +22,7 @@ When a fact is platform-specific, put it in that platform's folder. When you add
 
 - **New to the project?** [`global/project-overview.md`](global/project-overview.md) → [`global/architecture.md`](global/architecture.md)
 - **Changing BigCommerce behaviour?** [`integrations/bigcommerce/overview.md`](integrations/bigcommerce/overview.md), then the area file (server / storefront / admin / metafields)
+- **Calling BigCommerce APIs / working on the BC app or admin side?** [`skills/bigcommerce/README.md`](skills/bigcommerce/README.md) — look endpoints up with `npm run bc:api -- search <term>` instead of guessing
 - **Touching shared frontend logic (`src/core/`)?** [`global/core-library.md`](global/core-library.md)
 - **About to write code?** [`global/rules.md`](global/rules.md) (conventions + forbidden patterns)
 - **Changing *why* something is built the way it is?** Read [`global/design-decisions.md`](global/design-decisions.md) first
@@ -66,6 +67,7 @@ When a fact is platform-specific, put it in that platform's folder. When you add
 | [`skills/change-metafield-shape.md`](skills/change-metafield-shape.md) | Changing what is stored in the `Ad-Hoc Verify` metafield (touches 4 places) |
 | [`skills/debug-storefront.md`](skills/debug-storefront.md) | Diagnosing "widget missing", "checkout not blocked", "state wrong", "order not linked" |
 | [`skills/deploy.md`](skills/deploy.md) | Shipping server/admin/storefront and the `bc-metafields` edge function |
+| [`skills/bigcommerce/README.md`](skills/bigcommerce/README.md) | Index for BigCommerce platform work: [`tooling`](skills/bigcommerce/tooling.md) (OpenAPI CLI, docs MCP), [`api-map`](skills/bigcommerce/api-map.md), [`management-api`](skills/bigcommerce/management-api.md), [`scripts-and-webhooks`](skills/bigcommerce/scripts-and-webhooks.md), [`storefront-apis`](skills/bigcommerce/storefront-apis.md), [`admin-app`](skills/bigcommerce/admin-app.md) |
 
 ---
 

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "bigcommerce-docs": {
+      "type": "http",
+      "url": "https://docs.bigcommerce.com/_mcp/server"
+    }
+  }
+}

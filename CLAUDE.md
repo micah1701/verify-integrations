@@ -6,7 +6,7 @@
 |---|---|
 | **global/** | [project-overview](.ai/global/project-overview.md) · [architecture](.ai/global/architecture.md) · [core-library](.ai/global/core-library.md) · [adhoc-verify-api](.ai/global/adhoc-verify-api.md) · [rules](.ai/global/rules.md) · [tech-stack](.ai/global/tech-stack.md) · [design-decisions](.ai/global/design-decisions.md) · [deployment](.ai/global/deployment.md) · [known-issues](.ai/global/known-issues.md) |
 | **integrations/bigcommerce/** | [overview](.ai/integrations/bigcommerce/overview.md) · [server](.ai/integrations/bigcommerce/server.md) · [storefront](.ai/integrations/bigcommerce/storefront.md) · [checkout-enforcement](.ai/integrations/bigcommerce/checkout-enforcement.md) · [metafields](.ai/integrations/bigcommerce/metafields.md) · [admin-spa](.ai/integrations/bigcommerce/admin-spa.md) · [config-reference](.ai/integrations/bigcommerce/config-reference.md) |
-| **skills/** | [add-integration](.ai/skills/add-integration.md) · [add-config-option](.ai/skills/add-config-option.md) · [add-admin-endpoint](.ai/skills/add-admin-endpoint.md) · [change-metafield-shape](.ai/skills/change-metafield-shape.md) · [debug-storefront](.ai/skills/debug-storefront.md) · [deploy](.ai/skills/deploy.md) |
+| **skills/** | [add-integration](.ai/skills/add-integration.md) · [add-config-option](.ai/skills/add-config-option.md) · [add-admin-endpoint](.ai/skills/add-admin-endpoint.md) · [change-metafield-shape](.ai/skills/change-metafield-shape.md) · [debug-storefront](.ai/skills/debug-storefront.md) · [deploy](.ai/skills/deploy.md) · [bigcommerce/](.ai/skills/bigcommerce/README.md) (BC API lookup CLI `npm run bc:api`, docs MCP, API map, webhooks/scripts) |
 
 ## What This Is
 
