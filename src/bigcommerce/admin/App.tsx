@@ -5,7 +5,10 @@ import { ThemeProvider } from 'styled-components';
 import CustomersPage from './pages/CustomersPage.js';
 import OrdersPage from './pages/OrdersPage.js';
 import IntegrationConfigPage from './pages/IntegrationConfigPage.js';
-import type { AdHocAdminConfig } from '../../core/types.js';
+import OrderPanel from './pages/extensions/OrderPanel.js';
+import CustomerPanel from './pages/extensions/CustomerPanel.js';
+import ProductPanel from './pages/extensions/ProductPanel.js';
+import type { AdHocAdminConfig, AdHocExtensionConfig } from '../../core/types.js';
 
 // Admin config injected by the BC app backend (or for dev: set directly on window)
 const adminConfig = (
@@ -16,7 +19,23 @@ const adminConfig = (
   storeAccessToken: '',
 };
 
-type TabId = 'customers' | 'orders' | 'integration-config';
+// Present only when served from /bigcommerce/ext/:entity/:id (BC App Extension panel)
+const extensionConfig = (
+  window as Window & { AdHocExtensionConfig?: AdHocExtensionConfig }
+).AdHocExtensionConfig;
+
+function ExtensionPanel({ config }: { config: AdHocExtensionConfig }) {
+  return (
+    <ThemeProvider theme={theme}>
+      <GlobalStyles />
+      {config.entity === 'orders' && <OrderPanel config={config} />}
+      {config.entity === 'customers' && <CustomerPanel config={config} />}
+      {config.entity === 'products' && <ProductPanel config={config} />}
+    </ThemeProvider>
+  );
+}
+
+type TabId ='customers' | 'orders' | 'integration-config';
 
 const TABS = [
   { id: 'customers' as TabId, title: 'Customers' },
@@ -26,6 +45,8 @@ const TABS = [
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>('customers');
+
+  if (extensionConfig) return <ExtensionPanel config={extensionConfig} />;
 
   return (
     <ThemeProvider theme={theme}>

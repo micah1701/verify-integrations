@@ -5,6 +5,7 @@ import { handleAuth } from './auth';
 import { handleLoad } from './load';
 import { handleUninstall } from './uninstall';
 import { handleExtensionLoad } from './ext-load';
+import { extAuth, extCustomer, extOrder, extProduct, extProductSetFlag } from './ext-api';
 import {
   handleCustomersList,
   handleCustomerDetail,
@@ -27,6 +28,12 @@ bigcommerceRouter.get('/api/customers', handleCustomersList);
 bigcommerceRouter.get('/api/customers/:id', handleCustomerDetail);
 bigcommerceRouter.get('/api/orders', handleOrdersList);
 bigcommerceRouter.get('/api/orders/:id', handleOrderDetail);
+
+// App Extension panel API — authenticated by the panel session token (Bearer), bound to one record
+bigcommerceRouter.get('/api/ext/customers/:id', ...extAuth('customers'), extCustomer);
+bigcommerceRouter.get('/api/ext/orders/:id', ...extAuth('orders'), extOrder);
+bigcommerceRouter.get('/api/ext/products/:id', ...extAuth('products'), extProduct);
+bigcommerceRouter.put('/api/ext/products/:id', ...extAuth('products'), extProductSetFlag);
 
 // Redirect bare /admin path to trailing-slash version so relative asset paths resolve correctly
 bigcommerceRouter.get('/admin', (_req, res) => {

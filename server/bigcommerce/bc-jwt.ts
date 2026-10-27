@@ -34,22 +34,30 @@ function sessionKey(): string {
   return `${secret}:ext-session`;
 }
 
-export function mintSessionToken(storeHash: string): string {
-  return jwt.sign({ storeHash }, sessionKey(), {
+export interface ExtSession {
+  storeHash: string;
+  entity: string; // 'orders' | 'customers' | 'products'
+  id: number;
+}
+
+/** Token is bound to one store AND one record, so it can't be used to browse other records. */
+export function mintSessionToken(session: ExtSession): string {
+  return jwt.sign(session, sessionKey(), {
     algorithm: 'HS256',
     audience: SESSION_AUDIENCE,
     expiresIn: SESSION_TTL_SECONDS,
   });
 }
 
-/** Returns the store hash bound to the session token, or null if invalid/expired. */
-export function verifySessionToken(token: string): string | null {
+/** Returns the session bound to the token, or null if invalid/expired. */
+export function verifySessionToken(token: string): ExtSession | null {
   try {
-    const payload = jwt.verify(token, sessionKey(), {
+    const p = jwt.verify(token, sessionKey(), {
       algorithms: ['HS256'],
       audience: SESSION_AUDIENCE,
-    }) as { storeHash?: string };
-    return payload.storeHash ?? null;
+    }) as Partial<ExtSession>;
+    if (!p.storeHash || !p.entity || typeof p.id !== 'number') return null;
+    return { storeHash: p.storeHash, entity: p.entity, id: p.id };
   } catch {
     return null;
   }

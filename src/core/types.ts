@@ -151,6 +151,23 @@ export interface AdHocAdminConfig {
   storeAccessToken: string;
 }
 
+/** Injected by GET /bigcommerce/ext/:entity/:id for App Extension panels (no OAuth token). */
+export interface AdHocExtensionConfig {
+  entity: 'orders' | 'customers' | 'products';
+  id: number;
+  storeHash: string;
+  sessionToken: string;
+}
+
+export interface ExtOrderResponse extends Omit<OrderDetailResponse, 'metafieldSource'> {
+  metafieldSource: 'order' | 'cart' | 'customer' | 'none';
+}
+
+export interface ExtProductResponse {
+  product: { id: number; name: string; sku?: string };
+  requiresVerification: boolean;
+}
+
 // ─── BC Raw Metafield (from proxy response) ───────────────────────────────────
 
 export interface BCRawMetafield {

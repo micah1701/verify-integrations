@@ -21,7 +21,7 @@ interface MetafieldValue {
   verification: VerificationOutcome;
 }
 
-interface BCRawMetafield {
+export interface BCRawMetafield {
   id: number;
   namespace: string;
   key: string;
@@ -29,7 +29,7 @@ interface BCRawMetafield {
   permission_set: string;
 }
 
-interface BCCustomer {
+export interface BCCustomer {
   id: number;
   first_name: string;
   last_name: string;
@@ -43,8 +43,9 @@ interface BCCustomer {
   customer_group_id: number;
 }
 
-interface BCOrder {
+export interface BCOrder {
   id: number;
+  cart_id?: string;
   customer_id: number;
   billing_address: {
     first_name: string;
@@ -82,7 +83,7 @@ function resolveToken(
 
 // ─── BC Fetch Helper ───────────────────────────────────────────────────────────
 
-async function bcFetch<T>(
+export async function bcFetch<T>(
   storeHash: string,
   accessToken: string,
   path: string,
@@ -111,7 +112,7 @@ async function bcFetch<T>(
 
 // ─── Metafield Parsing ─────────────────────────────────────────────────────────
 
-function parseVerifyMetafield(raw: BCRawMetafield[]): MetafieldValue | null {
+export function parseVerifyMetafield(raw: BCRawMetafield[]): MetafieldValue | null {
   const mf = raw.find(
     (m) => m.namespace === 'Ad-Hoc Verify' && m.key === 'verification',
   );
@@ -140,7 +141,7 @@ const DEFAULT_RULESET = {
   requireOver21: false,
 };
 
-function evaluateVerificationState(
+export function evaluateVerificationState(
   mfValue: MetafieldValue | null | undefined,
 ): VerificationState {
   if (!mfValue) return 'unverified';

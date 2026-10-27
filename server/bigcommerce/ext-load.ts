@@ -60,7 +60,7 @@ export const handleExtensionLoad: RequestHandler = (req, res) => {
     entity,
     id: Number(id),
     storeHash,
-    sessionToken: mintSessionToken(storeHash),
+    sessionToken: mintSessionToken({ storeHash, entity, id: Number(id) }),
   };
   const injected = `<script>window.AdHocExtensionConfig = ${JSON.stringify(config)};</script>`;
 
