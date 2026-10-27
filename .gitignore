@@ -33,6 +33,8 @@ Thumbs.db
 *.njsproj
 *.sln
 
+supabase/.temp/
+
 
 #Ignore vscode AI rules
 .github\instructions\codacy.instructions.md
