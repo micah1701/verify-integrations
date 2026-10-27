@@ -1,6 +1,7 @@
 import type { RequestHandler } from 'express';
 import { upsertToken } from '../core/db';
 import { renderError } from './render-error';
+import { ensureExtensions } from './extensions';
 
 interface BCTokenResponse {
   access_token: string;
@@ -61,6 +62,8 @@ export const handleAuth: RequestHandler = async (req, res) => {
     });
 
     console.log(`[auth] installed store=${storeHash}`);
+    // Best-effort: registers Orders/Customers/Products Action-menu panels (needs store_app_extensions_manage)
+    await ensureExtensions(storeHash, data.access_token);
     res.redirect(302, '/bigcommerce/admin/');
   } catch (err) {
     console.error('[auth] unexpected error:', err);

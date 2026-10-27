@@ -4,6 +4,7 @@ import path from 'path';
 import { handleAuth } from './auth';
 import { handleLoad } from './load';
 import { handleUninstall } from './uninstall';
+import { handleExtensionLoad } from './ext-load';
 import {
   handleCustomersList,
   handleCustomerDetail,
@@ -17,6 +18,9 @@ export const bigcommerceRouter = Router();
 bigcommerceRouter.get('/auth', handleAuth);
 bigcommerceRouter.get('/load', handleLoad);
 bigcommerceRouter.get('/uninstall', handleUninstall);
+
+// App Extension panels (Action menu on BC Orders / Customers / Products)
+bigcommerceRouter.get('/ext/:entity/:id', handleExtensionLoad);
 
 // BC Management API proxy routes (storeHash in query string; access token stays server-side)
 bigcommerceRouter.get('/api/customers', handleCustomersList);
