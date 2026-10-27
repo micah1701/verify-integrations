@@ -32,7 +32,7 @@ The shopper never talks to this repo's server. Only the merchant admin does.
 - **VerificationStatus** — `pending → started → completed | manual_review | expired` (from the upstream platform).
 - **VerificationState** — _this repo's_ derived UI state: `verified | invalid | incomplete | unverified | pending_review`. Don't confuse with Status.
 - **FaceMatchScore** — `definite_match > likely_match > possible_match > no_match` (ordered strongest to weakest in `SCORE_ORDER`).
-- **Trigger rule** — which carts show the widget at all (`always | exclude_products | only_products` + product IDs).
+- **Trigger rule** — which carts show the widget at all (`always | exclude_products | only_products | product_flag` + product IDs).
 - **Checkout enforcement** — what happens at checkout when not verified (`block | warn | none`).
 - **Name match** — optional: the shipping name must hash-match the name on the license (`requireNameMatch`; hash = `SHA1:` of normalised first+last+verificationId, compared with `blockchain_name`).
 

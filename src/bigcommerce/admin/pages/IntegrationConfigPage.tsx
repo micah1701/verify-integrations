@@ -51,6 +51,7 @@ const TRIGGER_MODE_OPTIONS: Array<{ value: VerifyTriggerMode; content: string }>
   { value: 'always', content: 'Every transaction' },
   { value: 'exclude_products', content: 'Every transaction except specific products' },
   { value: 'only_products', content: 'Only for specific products' },
+  { value: 'product_flag', content: 'Only for products flagged in BigCommerce' },
 ];
 
 const CHECKOUT_ENFORCEMENT_OPTIONS: Array<{ value: CheckoutEnforcementMode; content: string }> = [
@@ -400,7 +401,7 @@ function ReadOnlyConfig({ configData }: { configData: IntegrationConfig }) {
   const triggerMode = configData.triggerRule?.mode ?? 'always';
   const triggerProductIds = configData.triggerRule?.productIds ?? [];
   const triggerDisplay =
-    triggerMode === 'always'
+    triggerMode === 'always' || triggerMode === 'product_flag'
       ? triggerModeLabel(triggerMode)
       : `${triggerModeLabel(triggerMode)} — IDs: ${triggerProductIds.length > 0 ? triggerProductIds.join(', ') : '(none)'}`;
 
@@ -502,7 +503,13 @@ function EditForm({
           options={TRIGGER_MODE_OPTIONS}
         />
       </FormGroup>
-      {triggerRule.mode !== 'always' && (
+      {triggerRule.mode === 'product_flag' && (
+        <Text color="secondary50" marginBottom="medium">
+          Flag products from BigCommerce: open Products, use a product’s Action menu → “Verification rule”.
+          Requires the store access token to have Products read access.
+        </Text>
+      )}
+      {(triggerRule.mode === 'exclude_products' || triggerRule.mode === 'only_products') && (
         <FormGroup>
           <FormControlLabel htmlFor="edit-trigger-products">
             {triggerRule.mode === 'exclude_products'

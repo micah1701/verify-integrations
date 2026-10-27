@@ -1,7 +1,8 @@
 /**
  * bc-metafields — BigCommerce Metafields Proxy
  *
- * Proxies cart, customer, and order metafield reads/writes to the BigCommerce
+ * Proxies cart, customer, and order metafield reads/writes (plus a read-only bulk
+ * product-flag lookup via resource 'products') to the BigCommerce
  * Management API server-to-server, bypassing browser CORS restrictions.
  *
  * The browser sends storeHash + storeAccessToken in the request body.
@@ -11,8 +12,8 @@
  *   action:           'read' | 'write'
  *   storeHash:        string    — BigCommerce store hash
  *   storeAccessToken: string    — X-Auth-Token (store-level API account)
- *   resource:         'cart' | 'customer' | 'order'
- *   resourceId:       string    — cart UUID, customer integer ID, or order integer ID
+ *   resource:         'cart' | 'customer' | 'order' | 'products' (read-only)
+ *   resourceId:       string    — cart UUID, customer/order integer ID, or comma-separated product IDs
  *   metafieldId?:     number    — present on write → PUT, absent → POST
  *   payload?:         object    — metafield body for write operations
  *
@@ -66,10 +67,25 @@ serve(async (req) => {
     })
   }
 
-  if (resource !== 'cart' && resource !== 'customer' && resource !== 'order') {
-    return new Response(JSON.stringify({ error: 'resource must be "cart", "customer", or "order"' }), {
+  if (resource !== 'cart' && resource !== 'customer' && resource !== 'order' && resource !== 'products') {
+    return new Response(JSON.stringify({ error: 'resource must be "cart", "customer", "order", or "products"' }), {
       status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
+  }
+
+  // 'products' is a read-only bulk lookup of the per-product verification flag.
+  // resourceId is a comma-separated list of product IDs (max 50).
+  if (resource === 'products') {
+    if (action !== 'read') {
+      return new Response(JSON.stringify({ error: '"products" resource is read-only' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+    if (typeof resourceId !== 'string' || !/^\d+(,\d+){0,49}$/.test(resourceId)) {
+      return new Response(JSON.stringify({ error: 'resourceId must be a comma-separated list of up to 50 product IDs' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
   }
 
   if (!resourceId) {
@@ -132,7 +148,10 @@ serve(async (req) => {
 
     // Build BC Management API URL (orders resolve to cart metafields via cart_id)
     const resourcePath = (resource === 'cart' || resource === 'order') ? 'carts' : 'customers'
-    const baseUrl = `${BC_API}/stores/${storeHash}/v3/${resourcePath}/${effectiveResourceId}/metafields`
+    const baseUrl = resource === 'products'
+      ? `${BC_API}/stores/${storeHash}/v3/catalog/products/metafields` +
+        `?namespace=Ad-Hoc+Verify&key=requires_verification&resource_id:in=${resourceId}&limit=50`
+      : `${BC_API}/stores/${storeHash}/v3/${resourcePath}/${effectiveResourceId}/metafields`
     const url = (action === 'write' && metafieldId) ? `${baseUrl}/${metafieldId}` : baseUrl
     const bcMethod = action === 'read' ? 'GET' : (metafieldId ? 'PUT' : 'POST')
 

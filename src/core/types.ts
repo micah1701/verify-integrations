@@ -31,11 +31,12 @@ export interface Ruleset {
 export type VerifyTriggerMode =
   | 'always'            // Show on every transaction (default)
   | 'exclude_products'  // Show unless the cart contains one of the specified product IDs
-  | 'only_products';    // Only show if the cart contains at least one specified product ID
+  | 'only_products'     // Only show if the cart contains at least one specified product ID
+  | 'product_flag';     // Only show if the cart contains a product flagged in BigCommerce (product metafield, set via the Products panel)
 
 export interface VerifyTriggerRule {
   mode: VerifyTriggerMode;
-  /** Product IDs to exclude or require, depending on mode. Unused when mode is 'always'. */
+  /** Product IDs to exclude or require, depending on mode. Unused when mode is 'always' or 'product_flag'. */
   productIds?: number[];
 }
 

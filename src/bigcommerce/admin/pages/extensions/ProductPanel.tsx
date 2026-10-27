@@ -42,7 +42,8 @@ export default function ProductPanel({ config }: { config: AdHocExtensionConfig 
             />
           </div>
           <Small>
-            Applies on stores using the “Product flag” trigger mode. Changes take effect on the storefront immediately.
+            Applies when the integration’s trigger is set to “Only for products flagged in BigCommerce”.
+            Storefronts pick up changes within about a minute.
           </Small>
           {saveError && <ErrorMessage message={saveError} />}
         </>

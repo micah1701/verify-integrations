@@ -147,6 +147,56 @@ export async function loadCustomerMetafields(
   return arr;
 }
 
+// ─── Product verification flags ───────────────────────────────────────────────
+
+const TTL_PRODUCT_FLAGS = 60 * 1000; // 1 min — merchants toggle flags in the admin panel
+const PRODUCT_FLAG_KEY = 'requires_verification';
+const PRODUCT_FLAG_BATCH = 50;       // matches the bc-metafields 'products' limit
+
+/**
+ * Returns the subset of `productIds` whose `Ad-Hoc Verify / requires_verification` product
+ * metafield is "true", or null if the flags could not be read (caller decides fail-open/closed).
+ */
+export async function loadFlaggedProductIds(
+  apiBase: string,
+  storeHash: string,
+  storeAccessToken: string,
+  productIds: number[],
+): Promise<number[] | null> {
+  if (productIds.length === 0) return [];
+  const ids = [...new Set(productIds)].sort((a, b) => a - b);
+  const cacheKey = `adhoc_product_flags_${ids.join('_')}`;
+  const cached = await dbGet<number[]>(cacheKey);
+  if (cached) {
+    log(`loadFlaggedProductIds: cache hit (${cached.length} flagged).`);
+    return cached;
+  }
+
+  const flagged: number[] = [];
+  for (let i = 0; i < ids.length; i += PRODUCT_FLAG_BATCH) {
+    const batch = ids.slice(i, i + PRODUCT_FLAG_BATCH);
+    const data = await bcMetafieldsProxy<{ data?: Array<BCRawMetafield & { resource_id?: number }> }>(apiBase, {
+      action: 'read',
+      storeHash,
+      storeAccessToken,
+      resource: 'products',
+      resourceId: batch.join(','),
+    });
+    if (!data || !Array.isArray(data.data)) {
+      log('loadFlaggedProductIds: proxy read failed — flags unknown.');
+      return null;
+    }
+    for (const mf of data.data) {
+      if (mf.namespace === 'Ad-Hoc Verify' && mf.key === PRODUCT_FLAG_KEY && mf.value === 'true' && mf.resource_id) {
+        flagged.push(mf.resource_id);
+      }
+    }
+  }
+  log(`loadFlaggedProductIds: flagged=[${flagged.join(', ')}] of cart products=[${ids.join(', ')}].`);
+  await dbSet(cacheKey, flagged, TTL_PRODUCT_FLAGS);
+  return flagged;
+}
+
 // ─── Metafield lookup ─────────────────────────────────────────────────────────
 
 export function findVerificationMetafield(

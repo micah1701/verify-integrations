@@ -17,5 +17,11 @@ BC App Extensions add an **Action-menu item** on the native Orders, Customers an
 - Extension `url` resolves against the app server root (`/bigcommerce/ext/...`).
 - `/v3/orders/:id/metafields` exists; `cart_id` is present on the v2 order.
 
+## Product flag → storefront
+- `triggerRule.mode = 'product_flag'` (set in the Integration Config tab). `cartQualifies()` in `storefront/entry.ts` calls `loadFlaggedProductIds()` (`bc-adapter.ts`), which does one bulk read through the `bc-metafields` edge function (`resource: 'products'`, read-only, ≤50 IDs per call → BC `GET /v3/catalog/products/metafields?resource_id:in=`). Result cached 1 min.
+- **Fails open**: missing credentials or a failed read keeps the widget/enforcement on.
+- The store access token used by the storefront needs Products **read** access. `triggerRule.productIds` is ignored in this mode; `only_products` / `exclude_products` are unchanged.
+- Deploy: `npx supabase functions deploy bc-metafields --use-api` (check `verify_jwt` first; it has no `_shared/` imports).
+
 ## Not done yet
-Storefront does not read the product flag yet (no `product_flag` trigger mode in `triggerRule`); existing installs need an extension re-sync.
+Existing installs need an extension re-sync (only `/auth` registers them).

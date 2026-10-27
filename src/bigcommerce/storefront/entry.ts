@@ -27,6 +27,7 @@ import {
   loadCustomerJwt,
   loadCartMetafields,
   loadCustomerMetafields,
+  loadFlaggedProductIds,
   findVerificationMetafield,
   saveCartMetafield,
   saveCustomerMetafield,
@@ -73,6 +74,8 @@ const DEFAULT_NAME_NOTICE =
 /** Returns true if the widget should be shown given the cart's product IDs and the configured trigger rule. */
 function evaluateTriggerRule(productIds: number[], rule?: VerifyTriggerRule): boolean {
   if (!rule || rule.mode === 'always') return true;
+  // 'product_flag' needs an async metafield lookup — handled by cartQualifies() below.
+  if (rule.mode === 'product_flag') return true;
   if (rule.mode === 'exclude_products') {
     const excluded = rule.productIds ?? [];
     return excluded.length === 0 || !productIds.some((id) => excluded.includes(id));
@@ -276,6 +279,24 @@ if (!userConfig.integrationKey) {
       }
 
       return container;
+    }
+
+    // Async wrapper over evaluateTriggerRule that also resolves the 'product_flag' mode.
+    // If the flags can't be read (no credentials, proxy failure) it fails OPEN — the widget and
+    // enforcement stay on — so a transient error never lets a restricted product skip verification.
+    async function cartQualifies(productIds: number[]): Promise<boolean> {
+      const rule = config.triggerRule;
+      if (rule?.mode !== 'product_flag') return evaluateTriggerRule(productIds, rule);
+      if (!config.storeHash || !config.storeAccessToken) {
+        log('Trigger rule "product_flag": storeHash/storeAccessToken not configured — failing open.');
+        return true;
+      }
+      const flagged = await loadFlaggedProductIds(config.apiBase, config.storeHash, config.storeAccessToken, productIds);
+      if (flagged === null) {
+        log('Trigger rule "product_flag": could not read product flags — failing open.');
+        return true;
+      }
+      return flagged.length > 0;
     }
 
     // ─── 4b. Cart Context (set during init) ──────────────────────────────────────
@@ -562,7 +583,7 @@ if (!userConfig.integrationKey) {
       log(`Cart loaded: cartId="${_cartId}", customerId=${_customerId}, loggedIn=${_customerId !== 0}, productIds=[${(cart.productIds ?? []).join(', ')}]`);
 
       // Trigger rule: hide the widget entirely if this cart doesn't qualify
-      if (!evaluateTriggerRule(cart.productIds ?? [], config.triggerRule)) {
+      if (!(await cartQualifies(cart.productIds ?? []))) {
         log(`Trigger rule (mode="${config.triggerRule?.mode}"): cart products do not match — widget hidden.`);
         container.remove();
         return;
@@ -898,7 +919,7 @@ if (!userConfig.integrationKey) {
     async function recheckTriggerRule(): Promise<void> {
       log('recheckTriggerRule: re-evaluating trigger rule after cart change.');
       const cart = await loadCart();
-      const shouldShow = cart ? evaluateTriggerRule(cart.productIds ?? [], config.triggerRule) : false;
+      const shouldShow = cart ? await cartQualifies(cart.productIds ?? []) : false;
       const container = document.getElementById(CONTAINER_ID);
       const isShown = container !== null;
 

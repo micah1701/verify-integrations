@@ -65,7 +65,7 @@ export async function getVerificationResult(
 // ─── BC Metafields proxy ──────────────────────────────────────────────────────
 
 export type BCMetafieldsAction = 'read' | 'write';
-export type BCMetafieldsResource = 'cart' | 'customer' | 'order';
+export type BCMetafieldsResource = 'cart' | 'customer' | 'order' | 'products';
 
 export interface BCMetafieldsProxyBody {
   action: BCMetafieldsAction;
