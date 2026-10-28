@@ -23,5 +23,12 @@ BC App Extensions add an **Action-menu item** on the native Orders, Customers an
 - The store access token used by the storefront needs Products **read** access. `triggerRule.productIds` is ignored in this mode; `only_products` / `exclude_products` are unchanged.
 - Deploy: `npx supabase functions deploy bc-metafields --use-api` (check `verify_jwt` first; it has no `_shared/` imports).
 
+## Product page badge
+- Optional notice (checkmark icon + text) on product pages. Config: `integration_config.productBadge` (`enabled`, `text`, `placement` preset or `custom` + `selector`/`position`), edited in the Integration Config tab ("Product Page Notice").
+- `handleProductPage()` in `storefront/entry.ts` runs independently of `pages` (like order-confirmation): it only acts when `form[data-cart-item-add] input[name="product_id"]` exists on a page that isn't cart/checkout. **The storefront script must therefore load on product pages** (Script Manager "all pages"). It fetches remote config when `templateId` is set (one request per product page view).
+- Whether a product "requires verification" follows `triggerRule` (`product_flag` → metafield lookup; `only_products`/`exclude_products` → ID list; `always` → every product). Unlike the cart widget it **fails closed** (no badge if the flag can't be read).
+- Rendering/placement presets: `storefront/product-badge.ts` (Cornerstone selectors with fallbacks; falls back to after the product title/h1). Merchant text is set via `textContent`. Icon is a generic inline SVG.
+- Saving relies on `sanitizeIntegrationConfig` (verify-api.ts) and the Ad-Hoc Verify API accepting the new `productBadge` key — **unverified** if the API whitelists `integration_config` keys.
+
 ## Not done yet
 Existing installs need an extension re-sync (only `/auth` registers them).

@@ -26,6 +26,9 @@ import type {
   CheckoutEnforcementMode,
   FaceMatchScore,
   IntegrationConfig,
+  ProductBadgeConfig,
+  ProductBadgePlacement,
+  ProductBadgePosition,
   VerifyTriggerMode,
   VerifyTriggerRule,
 } from '../../../core/types.js';
@@ -52,6 +55,23 @@ const TRIGGER_MODE_OPTIONS: Array<{ value: VerifyTriggerMode; content: string }>
   { value: 'exclude_products', content: 'Every transaction except specific products' },
   { value: 'only_products', content: 'Only for specific products' },
   { value: 'product_flag', content: 'Only for products flagged in BigCommerce' },
+];
+
+const DEFAULT_BADGE_TEXT = 'This product requires photo ID verification at checkout.';
+
+const BADGE_PLACEMENT_OPTIONS: Array<{ value: ProductBadgePlacement; content: string }> = [
+  { value: 'below_add_to_cart', content: 'Below the Add to Cart button' },
+  { value: 'above_add_to_cart', content: 'Above the Add to Cart button' },
+  { value: 'below_price', content: 'Below the price' },
+  { value: 'above_description', content: 'Above the product description' },
+  { value: 'custom', content: 'Custom (CSS selector)' },
+];
+
+const BADGE_POSITION_OPTIONS: Array<{ value: ProductBadgePosition; content: string }> = [
+  { value: 'after', content: 'After the element' },
+  { value: 'before', content: 'Before the element' },
+  { value: 'append', content: 'Inside, at the end' },
+  { value: 'prepend', content: 'Inside, at the start' },
 ];
 
 const CHECKOUT_ENFORCEMENT_OPTIONS: Array<{ value: CheckoutEnforcementMode; content: string }> = [
@@ -411,11 +431,18 @@ function ReadOnlyConfig({ configData }: { configData: IntegrationConfig }) {
     ? enforcementModeLabel(enforcementMode) + (warningMsg ? ` — "${warningMsg}"` : '')
     : '—';
 
+  const badge = configData.productBadge;
+  const badgePlacement = badge?.placement === 'custom'
+    ? `custom: ${badge.selector || '(no selector)'}`
+    : (BADGE_PLACEMENT_OPTIONS.find((o) => o.value === (badge?.placement ?? 'below_add_to_cart'))?.content ?? '');
+  const badgeDisplay = badge?.enabled ? `On — ${badgePlacement} — “${badge.text || DEFAULT_BADGE_TEXT}”` : 'Off';
+
   const rows: Array<{ label: string; value: string }> = [
     { label: 'Store Hash', value: configData.storeHash ?? '—' },
     { label: 'Store Access Token', value: configData.storeAccessToken ? '••••••••' : '—' },
     { label: 'Show Verify ID Button', value: triggerDisplay },
     { label: 'Checkout Behavior', value: enforcementDisplay },
+    { label: 'Product Page Badge', value: badgeDisplay },
     { label: 'Min Face Match Score', value: configData.ruleset?.minFaceMatchScore ?? 'Any' },
     { label: 'Require Over 18', value: configData.ruleset?.requireOver18 ? 'Yes' : 'No' },
     { label: 'Require Over 21', value: configData.ruleset?.requireOver21 ? 'Yes' : 'No' },
@@ -464,6 +491,11 @@ function EditForm({
 
   function updateEnforcement(patch: Partial<CheckoutEnforcement>) {
     updateDraft({ checkoutEnforcement: { ...checkoutEnforcement, ...patch } });
+  }
+
+  const productBadge: ProductBadgeConfig = draft.productBadge ?? { enabled: false };
+  function updateBadge(patch: Partial<ProductBadgeConfig>) {
+    updateDraft({ productBadge: { ...productBadge, ...patch } });
   }
 
   return (
@@ -525,6 +557,64 @@ function EditForm({
             placeholder="e.g. 101, 202, 303"
           />
         </FormGroup>
+      )}
+
+      <HR />
+
+      {/* Product page badge */}
+      <Text bold marginBottom="small">Product Page Notice</Text>
+      <Text color="secondary50" marginBottom="medium">
+        Show shoppers a notice on product pages for products that require ID verification (based on
+        “Show Verify ID Button” above). Requires the storefront script to load on product pages.
+      </Text>
+      <FormGroup>
+        <Checkbox
+          label="Show a notice on product pages"
+          checked={productBadge.enabled}
+          onChange={(e) => updateBadge({ enabled: e.target.checked })}
+        />
+      </FormGroup>
+      {productBadge.enabled && (
+        <>
+          <FormGroup>
+            <FormControlLabel htmlFor="edit-badge-text">Notice text</FormControlLabel>
+            <Input
+              id="edit-badge-text"
+              value={productBadge.text ?? ''}
+              onChange={(e) => updateBadge({ text: e.target.value || null })}
+              placeholder={DEFAULT_BADGE_TEXT}
+            />
+          </FormGroup>
+          <FormGroup>
+            <FormControlLabel htmlFor="edit-badge-placement">Where to show it</FormControlLabel>
+            <Select
+              value={productBadge.placement ?? 'below_add_to_cart'}
+              onOptionChange={(val) => updateBadge({ placement: val as ProductBadgePlacement })}
+              options={BADGE_PLACEMENT_OPTIONS}
+            />
+          </FormGroup>
+          {productBadge.placement === 'custom' && (
+            <>
+              <FormGroup>
+                <FormControlLabel htmlFor="edit-badge-selector">CSS selector</FormControlLabel>
+                <Input
+                  id="edit-badge-selector"
+                  value={productBadge.selector ?? ''}
+                  onChange={(e) => updateBadge({ selector: e.target.value || null })}
+                  placeholder=".productView-info"
+                />
+              </FormGroup>
+              <FormGroup>
+                <FormControlLabel htmlFor="edit-badge-position">Position</FormControlLabel>
+                <Select
+                  value={productBadge.position ?? 'after'}
+                  onOptionChange={(val) => updateBadge({ position: val as ProductBadgePosition })}
+                  options={BADGE_POSITION_OPTIONS}
+                />
+              </FormGroup>
+            </>
+          )}
+        </>
       )}
 
       <HR />

@@ -54,6 +54,31 @@ export interface CheckoutEnforcement {
   warningMessage?: string | null;
 }
 
+// ─── Product Page Badge ("this product requires ID verification") ─────────────
+
+/** Preset spots on a product page (Stencil/Cornerstone selectors with fallbacks), or a custom selector. */
+export type ProductBadgePlacement =
+  | 'above_description'
+  | 'below_price'
+  | 'above_add_to_cart'
+  | 'below_add_to_cart'
+  | 'custom';
+
+export type ProductBadgePosition = 'before' | 'after' | 'prepend' | 'append';
+
+export interface ProductBadgeConfig {
+  /** Global on/off switch. Default: false. */
+  enabled: boolean;
+  /** Badge text. Falsy = built-in default. */
+  text?: string | null;
+  /** Where to inject. Default: 'below_add_to_cart'. */
+  placement?: ProductBadgePlacement;
+  /** CSS selector — only used when placement is 'custom'. */
+  selector?: string | null;
+  /** Where relative to the custom selector's element. Default: 'after'. */
+  position?: ProductBadgePosition;
+}
+
 // ─── Verification Result (from get-verification-result / webhook) ──────────────
 
 export interface VerificationOutcome {
@@ -116,6 +141,7 @@ export interface AdHocVerifyConfig {
   manualReview?: Partial<ManualReviewConfig>;
   triggerRule?: VerifyTriggerRule;
   checkoutEnforcement?: CheckoutEnforcement;
+  productBadge?: ProductBadgeConfig;
   /** Set to true to enable verbose debug logging to the browser console. */
   logging?: boolean;
   onComplete?: (id: string) => void;
@@ -140,6 +166,7 @@ export interface IntegrationConfig {
   manualReview?: Partial<ManualReviewConfig>;
   triggerRule?: VerifyTriggerRule;
   checkoutEnforcement?: CheckoutEnforcement;
+  productBadge?: ProductBadgeConfig;
   buttonText?: string;
   selector?: string;
 }

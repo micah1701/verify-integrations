@@ -146,7 +146,7 @@ export async function refreshAdhocToken(
 }
 
 function sanitizeIntegrationConfig(raw: IntegrationConfig): IntegrationConfig {
-  const { storeHash, storeAccessToken, pages, ruleset, manualReview, buttonText, selector, triggerRule, checkoutEnforcement } = raw;
+  const { storeHash, storeAccessToken, pages, ruleset, manualReview, buttonText, selector, triggerRule, checkoutEnforcement, productBadge } = raw;
   const out: IntegrationConfig = {};
   if (storeHash !== undefined) out.storeHash = storeHash;
   if (storeAccessToken !== undefined) out.storeAccessToken = storeAccessToken;
@@ -157,6 +157,7 @@ function sanitizeIntegrationConfig(raw: IntegrationConfig): IntegrationConfig {
   if (selector !== undefined) out.selector = selector;
   if (triggerRule !== undefined) out.triggerRule = triggerRule;
   if (checkoutEnforcement !== undefined) out.checkoutEnforcement = checkoutEnforcement;
+  if (productBadge !== undefined) out.productBadge = productBadge;
   return out;
 }
 

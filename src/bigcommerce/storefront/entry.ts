@@ -34,6 +34,7 @@ import {
   saveOrderMetafield,
   invalidateMetafieldCache,
 } from './bc-adapter.js';
+import { renderProductBadge } from './product-badge.js';
 import { renderCheckoutBlock, removeCheckoutBlock, renderCheckoutWarn, insertShippingNameNotice, removeShippingNameNotice } from './checkout-block.js';
 import { resolveOverallState } from '../../core/verification-state.js';
 import { createVerification, getTemplateIntegrationConfig, getVerificationResult, computeNameHash } from '../../core/verify-api.js';
@@ -225,6 +226,64 @@ if (!userConfig.integrationKey) {
     } catch (_) {
       log('Order confirmation: failed to save order metafield (non-fatal).');
     }
+  }
+
+  // ─── 4c. Product Page Badge ──────────────────────────────────────────────────
+
+  // Product pages aren't in detectPage() / `pages` (those gate the cart widget). The badge runs
+  // independently, like the order-confirmation handler, and only when the DOM looks like a
+  // Stencil product page: an add-to-cart form with a product_id input.
+  function detectProductId(): number | null {
+    if (currentPage !== null) return null;
+    const input = document.querySelector<HTMLInputElement>('form[data-cart-item-add] input[name="product_id"]');
+    const id = input ? parseInt(input.value, 10) : NaN;
+    return id > 0 ? id : null;
+  }
+
+  /**
+   * Whether this single product would trigger verification under the configured trigger rule.
+   * Unlike the cart widget (which fails open), this fails CLOSED: if the flag can't be read we
+   * show no badge rather than claim a product requires verification when we don't know.
+   */
+  async function productRequiresVerification(productId: number): Promise<boolean> {
+    const rule = config.triggerRule;
+    if (rule?.mode !== 'product_flag') return evaluateTriggerRule([productId], rule);
+    if (!config.storeHash || !config.storeAccessToken) {
+      log('Product badge: storeHash/storeAccessToken not configured — cannot read product flag.');
+      return false;
+    }
+    const flagged = await loadFlaggedProductIds(config.apiBase, config.storeHash, config.storeAccessToken, [productId]);
+    return flagged !== null && flagged.includes(productId);
+  }
+
+  async function handleProductPage(): Promise<void> {
+    const productId = detectProductId();
+    if (!productId) return;
+    log(`Product page detected: productId=${productId}.`);
+
+    // Remote integration_config fills in anything not set in window.AdHocVerifyConfig.
+    if (userConfig.templateId) {
+      const remote = await getTemplateIntegrationConfig(config.apiBase, config.integrationKey, userConfig.templateId);
+      if (remote?.ok) {
+        if (!userConfig.storeHash && remote.data.storeHash) config.storeHash = remote.data.storeHash;
+        if (!userConfig.storeAccessToken && remote.data.storeAccessToken) config.storeAccessToken = remote.data.storeAccessToken;
+        if (!userConfig.triggerRule && remote.data.triggerRule) config.triggerRule = remote.data.triggerRule;
+        if (!userConfig.productBadge && remote.data.productBadge) config.productBadge = remote.data.productBadge;
+      } else {
+        log('Product badge: remote config fetch failed — using local config only.');
+      }
+    }
+
+    const badge = config.productBadge;
+    if (!badge?.enabled) {
+      log('Product badge: disabled — nothing to do.');
+      return;
+    }
+    if (!(await productRequiresVerification(productId))) {
+      log(`Product badge: product ${productId} does not require verification — no badge.`);
+      return;
+    }
+    renderProductBadge(badge);
   }
 
   if (currentPage && configPages.includes(currentPage)) {
@@ -1101,6 +1160,15 @@ if (!userConfig.integrationKey) {
     }
 
   } // end page guard
+
+  // Product pages: optional "requires ID verification" badge (no-op unless a product form is present).
+  if (currentPage === null) {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => void handleProductPage());
+    } else {
+      void handleProductPage();
+    }
+  }
 
   // Order confirmation: runs silently regardless of configPages, writes order metafield.
   if (currentPage === 'order-confirmation') {
