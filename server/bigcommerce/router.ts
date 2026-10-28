@@ -37,7 +37,14 @@ bigcommerceRouter.get('/api/ext/products/:id', ...extAuth('products'), extProduc
 bigcommerceRouter.put('/api/ext/products/:id', ...extAuth('products'), extProductSetFlag);
 
 // Redirect bare /admin path to trailing-slash version so relative asset paths resolve correctly
-bigcommerceRouter.get('/admin', (_req, res) => {
+// Express routing is non-strict, so '/admin' also matches '/admin/' — only redirect when the
+// request really lacks the trailing slash, otherwise this redirects to itself forever.
+bigcommerceRouter.get('/admin', (req, res, next) => {
+  const pathname = req.originalUrl.split('?')[0];
+  if (pathname.endsWith('/')) {
+    next();
+    return;
+  }
   res.redirect(301, '/bigcommerce/admin/');
 });
 
