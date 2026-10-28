@@ -4,7 +4,7 @@ BC App Extensions add an **Action-menu item** on the native Orders, Customers an
 
 ## Flow
 1. `/auth` calls `ensureExtensions()` (`server/bigcommerce/extensions.ts`) after the token upsert: GraphQL `createAppExtension` / `updateAppExtension`, idempotent, never throws. Needs scope **`store_app_extensions_manage`** (Developer Portal; merchants re-authorize).
-2. BC opens `GET /bigcommerce/ext/:entity/:id?signed_payload_jwt=...` (`ext-load.ts`). JWT verified via `bc-jwt.ts`; the signed `url` claim must match the entity/id. Serves `dist/admin/index.html` with `window.AdHocExtensionConfig = {entity, id, storeHash, sessionToken}` (no OAuth token), `no-store`, BC `frame-ancestors`.
+2. BC delivers extension clicks to the app's **Load callback** (`GET /bigcommerce/load`); the signed `url` claim holds the resolved extension path (`"/"` for a normal open). `load.ts` calls `parseExtensionUrl(claims.url)` and, on a match, `sendExtensionPanel()` instead of the main SPA. `GET /bigcommerce/ext/:entity/:id` (`ext-load.ts`) remains as a direct-URL fallback. (Found on first dev-store test: the panels showed the main SPA because `/load` ignored `url`.) JWT verified via `bc-jwt.ts`; the signed `url` claim must match the entity/id. Serves `dist/admin/index.html` with `window.AdHocExtensionConfig = {entity, id, storeHash, sessionToken}` (no OAuth token), `no-store`, BC `frame-ancestors`.
 3. `App.tsx` renders `pages/extensions/{Order,Customer,Product}Panel` when that config exists.
 4. Panels call `GET|PUT /bigcommerce/api/ext/{customers|orders|products}/:id` (`ext-api.ts`) with `Authorization: Bearer <sessionToken>`. Token = 15 min, HS256, bound to store + entity + record id.
 

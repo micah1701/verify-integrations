@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { getToken } from '../core/db';
 import { renderError } from './render-error';
+import { parseExtensionUrl, sendExtensionPanel } from './ext-load';
 
 interface BCLoadClaims {
   sub: string; // "stores/HASH"
@@ -11,6 +12,7 @@ interface BCLoadClaims {
   iat: number;
   exp: number;
   user: { id: number; email: string };
+  url?: string; // "/" for a normal open; the resolved extension path for App Extension clicks
 }
 
 const ADMIN_HTML_PATH = path.resolve('dist/admin/index.html');
@@ -46,6 +48,18 @@ export const handleLoad: RequestHandler = (req, res) => {
   if (!storeHash) {
     res.status(400).send(renderError('Invalid Token', 'Could not extract store identifier from token.'));
     return;
+  }
+
+  // App Extension clicks arrive here too: the signed `url` claim holds the resolved extension
+  // path (normal app opens carry "/"). Serve the record panel instead of the full SPA.
+  const ext = parseExtensionUrl(claims.url);
+  if (ext) {
+    console.log(`[load] extension panel entity=${ext.entity} id=${ext.id} store=${storeHash}`);
+    sendExtensionPanel(res, ext.entity, ext.id, storeHash);
+    return;
+  }
+  if (claims.url && claims.url !== '/') {
+    console.log(`[load] unrecognised url claim "${claims.url}" — serving main app`);
   }
 
   const tokenRecord = getToken(storeHash);
