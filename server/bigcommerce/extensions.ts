@@ -64,9 +64,9 @@ const UPDATE_MUTATION = `
 /**
  * Idempotently registers the extensions in EXTENSIONS: creates missing ones and
  * updates url/label on existing ones (context and model are immutable).
- * Never throws — a failure here must not break app installation.
+ * Never throws — a failure here must not break app installation. Returns whether it succeeded.
  */
-export async function ensureExtensions(storeHash: string, accessToken: string): Promise<void> {
+export async function ensureExtensions(storeHash: string, accessToken: string): Promise<boolean> {
   try {
     const data = await gql<{
       store: { appExtensions: { edges: { node: ExistingExtension }[] } };
@@ -89,7 +89,9 @@ export async function ensureExtensions(storeHash: string, accessToken: string): 
         console.log(`[extensions] updated ${def.model} store=${storeHash}`);
       }
     }
+    return true;
   } catch (err) {
     console.error(`[extensions] registration failed store=${storeHash}:`, err);
+    return false;
   }
 }

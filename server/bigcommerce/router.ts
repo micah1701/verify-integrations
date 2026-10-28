@@ -17,7 +17,7 @@ import {
 export const bigcommerceRouter = Router();
 
 // BigCommerce app lifecycle callbacks
-bigcommerceRouter.get('/auth', handleAuth);
+bigcommerceRouter.get('/auth', allowBcFraming, handleAuth);
 bigcommerceRouter.get('/load', allowBcFraming, handleLoad);
 bigcommerceRouter.get('/uninstall', handleUninstall);
 
@@ -35,6 +35,9 @@ bigcommerceRouter.get('/api/ext/customers/:id', ...extAuth('customers'), extCust
 bigcommerceRouter.get('/api/ext/orders/:id', ...extAuth('orders'), extOrder);
 bigcommerceRouter.get('/api/ext/products/:id', ...extAuth('products'), extProduct);
 bigcommerceRouter.put('/api/ext/products/:id', ...extAuth('products'), extProductSetFlag);
+
+// /auth redirects here inside the BC control-panel iframe, so the whole /admin tree must be framable
+bigcommerceRouter.use('/admin', allowBcFraming);
 
 // Redirect bare /admin path to trailing-slash version so relative asset paths resolve correctly
 // Express routing is non-strict, so '/admin' also matches '/admin/' — only redirect when the

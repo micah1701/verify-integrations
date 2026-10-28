@@ -6,7 +6,7 @@ Express handlers, CommonJS, extensionless imports. Shared pieces: `../core/db` (
 1. Requires `code` and `context` query params (else 400 error page).
 2. Requires env `BC_CLIENT_ID`, `BC_CLIENT_SECRET`, `APP_BASE_URL` (else 500 page).
 3. `POST https://login.bigcommerce.com/oauth2/token` (form-encoded: `client_id, client_secret, code, scope, context, grant_type=authorization_code, redirect_uri=${APP_BASE_URL}/bigcommerce/auth`).
-4. Non-OK → 502 page. OK → `storeHash = data.context.split('/')[1]`, `upsertToken({store_hash, access_token, scope})` (preserves `installed_at` on reinstall), `302 /bigcommerce/admin/`.
+4. Non-OK → 502 page. OK → `storeHash = data.context.split('/')[1]`, `upsertToken({store_hash, access_token, scope})` (preserves `installed_at` on reinstall), `ensureExtensions()` (see app-extensions.md), then renders a static confirmation page (`render-install-success.ts`: "open from Apps → My Apps"). It does NOT redirect to `/admin/` — `/auth` has no signed payload, so the SPA there would have no store config. Route is served with `allowBcFraming` (BC shows it in an iframe).
 - The `redirect_uri` must exactly equal the Auth Callback URL registered in the BC Developer Portal.
 
 ## `load.ts` — `GET /bigcommerce/load`
