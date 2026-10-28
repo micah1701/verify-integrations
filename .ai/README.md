@@ -56,6 +56,8 @@ When a fact is platform-specific, put it in that platform's folder. When you add
 | [`integrations/bigcommerce/checkout-enforcement.md`](integrations/bigcommerce/checkout-enforcement.md) | `checkout-block.ts` — blocking/warning mechanics for BC's React checkout SPA |
 | [`integrations/bigcommerce/metafields.md`](integrations/bigcommerce/metafields.md) | Metafield schema, cart/customer/order write paths, `bc-metafields` edge function, caching |
 | [`integrations/bigcommerce/admin-spa.md`](integrations/bigcommerce/admin-spa.md) | React + BigDesign admin: tabs, proxy client, Integration Config auth flow |
+| [`integrations/bigcommerce/permissions.md`](integrations/bigcommerce/permissions.md) | Minimum BC API scopes per credential (registered app vs store-level account), read-only vs modify, merchant setup checklist |
+| [`integrations/bigcommerce/app-extensions.md`](integrations/bigcommerce/app-extensions.md) | Orders/Customers/Products Action-menu panels, product flag, product-page badge |
 | [`integrations/bigcommerce/config-reference.md`](integrations/bigcommerce/config-reference.md) | Every `AdHocVerifyConfig` / `IntegrationConfig` option, defaults, precedence |
 
 ### Skills (Step-by-Step Recipes)

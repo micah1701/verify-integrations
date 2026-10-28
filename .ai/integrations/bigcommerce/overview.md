@@ -59,7 +59,10 @@ Global: `GET /health` → `{status:'ok', ts}`.
 
 ## BC OAuth scopes
 
-Registered app (min): Customers read-only, Orders read-only. Store-level API account created by the merchant for the storefront: Carts read/write + Customers read/write (Orders read is needed by `bc-metafields` for `resource: 'order'` to resolve `cart_id`; writing order-linked data goes to *cart* metafields, so no Orders write scope is required).
+Two credentials, each with its own minimum scopes — full tables, rationale and setup checklist in [`permissions.md`](permissions.md). Summary:
+
+- **Registered app** (server-side): Customers read-only, Orders read-only, Carts read-only, Products modify, App extensions manage.
+- **Store-level API account** (merchant creates; token is exposed to the browser): Carts modify, Customers modify, Orders read-only, Products read-only (only for `product_flag`), Metafields standard. No Checkouts / Storefront-token scopes.
 
 ## External BC docs
 
