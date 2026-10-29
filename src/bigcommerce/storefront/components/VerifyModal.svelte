@@ -6,6 +6,8 @@
   export let verificationUrl: string;
   export let verificationId: string;
   export let apiBase: string;
+  /** Origin the iframe is served from; postMessage events from anywhere else are ignored. */
+  export let allowedOrigin: string;
 
   const dispatch = createEventDispatcher<{
     complete: { verificationId: string; result: VerificationOutcome | null };
@@ -49,33 +51,36 @@
       handleManualReview(verificationId);
     } else if (data.status === 'expired') {
       stopPolling();
+    } else if (!['pending', 'started'].includes(data.status)) {
+      console.warn('[AD-HOC VERIFY] Unrecognised verification status from API:', data.status);
     }
   }
 
   function onMessage(event: MessageEvent) {
-    if (event.data?.type === 'adhoc-verify-complete') {
-      window.removeEventListener('message', onMessage);
-      if (completed) return;
-      const msgId: string = event.data.verificationId ?? verificationId;
-      // Fetch result then fire completion (mirrors original.js fetchResultAndComplete)
-      getVerificationResult(apiBase, msgId).then((data) => {
-        if (data?.status === 'manual_review') {
-          handleManualReview(msgId);
-        } else {
-          handleCompletion(msgId, data?.result ?? null);
-        }
-      });
-    }
+    if (event.origin !== allowedOrigin) return;
+    if (event.data?.type !== 'adhoc-verify-complete') return;
+    if (event.data.verificationId && event.data.verificationId !== verificationId) return;
+    // The message is only a hint — confirm with the API so we act on the authoritative status.
+    void pollOnce();
+  }
+
+  // Background tabs throttle timers; re-check as soon as the shopper comes back from their phone.
+  function onVisible() {
+    if (document.visibilityState === 'visible') void pollOnce();
   }
 
   onMount(() => {
     pollTimer = setInterval(pollOnce, POLL_INTERVAL);
     window.addEventListener('message', onMessage);
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
   });
 
   onDestroy(() => {
     stopPolling();
     window.removeEventListener('message', onMessage);
+    document.removeEventListener('visibilitychange', onVisible);
+    window.removeEventListener('focus', onVisible);
   });
 
   function handleClose() {

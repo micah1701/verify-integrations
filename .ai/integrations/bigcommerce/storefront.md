@@ -20,7 +20,7 @@ Svelte 4 + TypeScript compiled to one IIFE (`dist/storefront/bigcommerce.js`). E
 | `checkout-block.ts` | Checkout button blocking, warning banners, shipping-name notice → [`checkout-enforcement.md`](checkout-enforcement.md) |
 | `logger.ts` | `setLogging(bool)` / `log()`; no-op unless `config.logging === true` |
 | `components/StatusCard.svelte` | Renders state: verified badge / pending text / message + "Verify ID" button (emits `verify`) |
-| `components/VerifyModal.svelte` | Overlay + iframe to `${verifyBase}/verify/${id}`; polls every 3 s and listens for `postMessage`; emits `complete` / `manual_review` / `close` |
+| `components/VerifyModal.svelte` | Overlay + iframe to `${verifyBase}/verify/${id}`; polls every 3 s (and immediately on tab focus/visibility), listens for `postMessage` only from `allowedOrigin` (the `verifyBase` origin; the message is a hint, the poll is authoritative); emits `complete` / `manual_review` / `close` |
 
 ## Boot sequence
 
@@ -63,12 +63,12 @@ For each of `storeHash, storeAccessToken, ruleset, manualReview, triggerRule, ch
 
 `StatusCard` emits `verify` → `handleVerifyClick()`:
 1. Guard against double-open (`modalWrapperEl`).
-2. Reuse `sessionStorage[SESSION_KEY]` (pending ID) or `createVerification()` (`template_id` included when configured); store the ID.
+2. Reuse `sessionStorage[SESSION_KEY]` (pending ID) or `createVerification()` (`template_id` included when configured, plus `external_id` = `bigcommerce_user_<customerId>` if logged in, else `bigcommerce_cart_<cartId>`); store the ID and its `external_id` (`SESSION_REF_KEY`). A pending ID whose stored reference no longer matches (e.g. shopper logged in) is discarded and a new verification created.
 3. Mount `VerifyModal` in a body-level wrapper.
 4. Events:
    - `complete` → clear `SESSION_KEY`, destroy modal, `saveVerificationAndRefreshUI(id, result)`.
    - `manual_review` → `handleManualReviewResult(id)`.
-   - `close` → destroy modal (pending ID kept so reopening resumes the same verification).
+   - `close` → destroy modal, then `resolvePendingVerification()` does one final status check and runs the normal completion path if finished (otherwise the pending ID is kept so reopening resumes). `init()` runs the same check on every page load when a pending ID exists and the state isn't verified.
 5. Errors → `console.error` + `alert('Unable to start verification. Please try again.')`.
 
 ### `saveVerificationAndRefreshUI`
@@ -98,6 +98,7 @@ Only when `triggerRule.mode !== 'always'`. Monkey-patches `window.fetch` and `XM
 | Const | Key | Lifetime | Meaning |
 |---|---|---|---|
 | `SESSION_KEY` | `adhoc_verify_pending_<key>` | set at modal open, cleared on complete/manual review | In-progress verification ID (resume on reopen) |
+| `SESSION_REF_KEY` | `adhoc_verify_pending_ref_<key>` | alongside `SESSION_KEY` | `external_id` the pending verification was created with |
 | `COMPLETED_KEY` | `adhoc_verify_done_<key>` | tab session | `{verificationId, result, status}` for carry-over, backfill and order write |
 | `CART_ID_KEY` | `adhoc_verify_cartid_<key>` | tab session | Cart ID for confirmation page |
 | `ORDER_ID_KEY` | `adhoc_verify_orderid_<key>` | tab session | Order ID captured at checkout |

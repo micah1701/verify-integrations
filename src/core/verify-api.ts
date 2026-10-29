@@ -18,6 +18,8 @@ async function safeFetch<T>(url: string, options?: RequestInit): Promise<T | nul
 
 export interface CreateVerificationBody {
   template_id?: string;
+  /** Caller-supplied reference, e.g. "bigcommerce_user_123" or "bigcommerce_cart_<uuid>". */
+  external_id?: string;
   webhook_url?: string;
   requested_fields?: string[];
 }
@@ -57,8 +59,11 @@ export async function getVerificationResult(
   apiBase: string,
   id: string,
 ): Promise<VerificationResultResponse | null> {
+  // The endpoint currently rejects requests without a Content-Type header (400 "Missing content
+  // type"), even for GET. CORS already allows the content-type header.
   return safeFetch<VerificationResultResponse>(
     `${apiBase}/get-verification-result?id=${encodeURIComponent(id)}`,
+    { headers: { 'Content-Type': 'application/json' } },
   );
 }
 

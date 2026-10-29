@@ -29,7 +29,7 @@ Verification URL shown to shoppers: `${verifyBase}/verify/${id}` (default `verif
 
 ## Status values (poll result)
 
-`pending → started → completed | manual_review | expired`. The storefront modal polls every 3 s and also listens for the `postMessage`. `expired` just stops polling.
+`pending → started → completed | manual_review | expired`. The storefront modal polls every 3 s and also listens for the `postMessage` (origin-checked). The storefront sends `external_id` (`bigcommerce_user_<id>` / `bigcommerce_cart_<id>`) on `/create-verification`; **adhocverify.com must accept and store it** (not yet confirmed) and the hosted page must post `adhoc-verify-complete` to its parent when completed on another device. `expired` just stops polling.
 
 ## `face_match_score`
 

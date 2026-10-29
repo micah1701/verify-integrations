@@ -138,6 +138,10 @@ if (!userConfig.integrationKey) {
   // is reopened mid-session.
   const SESSION_KEY = `adhoc_verify_pending_${config.integrationKey}`;
 
+  // The external_id the pending verification was created with. If it no longer matches (e.g. the
+  // shopper logged in mid-session) a fresh verification is created instead of resuming.
+  const SESSION_REF_KEY = `adhoc_verify_pending_ref_${config.integrationKey}`;
+
   // Completed: set when verification finishes, survives page navigation within the same session.
   // Used to backfill the customer metafield after login/account creation, and to write the order
   // metafield on the order confirmation page.
@@ -890,6 +894,13 @@ if (!userConfig.integrationKey) {
           log('Customer is verified — checkout block not required.');
         }
       }
+
+      // A verification may have finished while no modal was listening (page reloaded, modal closed
+      // before the completion event arrived, completed on another device). Pick it up now.
+      if (resolved.state !== 'verified' && sessionStorage.getItem(SESSION_KEY)) {
+        log('Pending verification found in sessionStorage — checking whether it has completed.');
+        await resolvePendingVerification();
+      }
     }
 
     // ─── 8. Svelte 4 Component Mounting ─────────────────────────────────────────
@@ -911,6 +922,43 @@ if (!userConfig.integrationKey) {
       statusCardInstance.$on('verify', () => void handleVerifyClick());
     }
 
+    /** Reference id sent to Ad-Hoc Verify: the customer when logged in, otherwise the cart. */
+    function buildExternalId(): string | undefined {
+      if (_customerId !== 0) return `bigcommerce_user_${_customerId}`;
+      if (_cartId) return `bigcommerce_cart_${_cartId}`;
+      return undefined;
+    }
+
+    /**
+     * Fetches the pending verification once and, if it has finished, runs the normal completion
+     * path. Safety net for when the modal's poll / postMessage never reported the result.
+     * Returns true if a finished verification was handled.
+     */
+    async function resolvePendingVerification(): Promise<boolean> {
+      const id = sessionStorage.getItem(SESSION_KEY);
+      if (!id) return false;
+      const data = await getVerificationResult(config.apiBase, id);
+      log(`resolvePendingVerification: id="${id}" status="${data?.status ?? 'unavailable'}"`);
+      if (!data) return false;
+      if (data.status === 'completed') {
+        sessionStorage.removeItem(SESSION_KEY);
+        sessionStorage.removeItem(SESSION_REF_KEY);
+        await saveVerificationAndRefreshUI(id, data.result ?? null);
+        return true;
+      }
+      if (data.status === 'manual_review') {
+        sessionStorage.removeItem(SESSION_KEY);
+        sessionStorage.removeItem(SESSION_REF_KEY);
+        await handleManualReviewResult(id);
+        return true;
+      }
+      if (data.status === 'expired') {
+        sessionStorage.removeItem(SESSION_KEY);
+        sessionStorage.removeItem(SESSION_REF_KEY);
+      }
+      return false;
+    }
+
     async function handleVerifyClick(): Promise<void> {
       if (modalWrapperEl) {
         log('Verify button clicked but modal is already open — ignoring.');
@@ -919,16 +967,26 @@ if (!userConfig.integrationKey) {
 
       log('Verify button clicked — starting verification flow.');
       try {
+        const externalId = buildExternalId();
         let id = sessionStorage.getItem(SESSION_KEY);
+
+        if (id && (sessionStorage.getItem(SESSION_REF_KEY) ?? undefined) !== externalId) {
+          log('Pending verification was created for a different cart/customer — discarding it.');
+          sessionStorage.removeItem(SESSION_KEY);
+          id = null;
+        }
 
         if (id) {
           log(`Resuming in-progress verification session. verificationId="${id}"`);
         } else {
-          log('No in-progress session — creating a new verification.');
+          log(`No in-progress session — creating a new verification. external_id="${externalId ?? 'none'}"`);
           const body: Parameters<typeof createVerification>[2] = {};
           if (config.templateId) body.template_id = config.templateId;
+          if (externalId) body.external_id = externalId;
           ({ id } = await createVerification(config.apiBase, config.integrationKey, body));
           sessionStorage.setItem(SESSION_KEY, id);
+          if (externalId) sessionStorage.setItem(SESSION_REF_KEY, externalId);
+          else sessionStorage.removeItem(SESSION_REF_KEY);
           log(`New verification created. verificationId="${id}"`);
         }
 
@@ -940,12 +998,18 @@ if (!userConfig.integrationKey) {
 
         const modal = new VerifyModal({
           target: modalWrapperEl,
-          props: { verificationUrl, verificationId: id, apiBase: config.apiBase },
+          props: {
+            verificationUrl,
+            verificationId: id,
+            apiBase: config.apiBase,
+            allowedOrigin: new URL(config.verifyBase).origin,
+          },
         });
 
         modal.$on('complete', (e: CustomEvent<{ verificationId: string; result: VerificationOutcome | null }>) => {
           log(`Modal fired "complete" event. verificationId="${e.detail.verificationId}"`, e.detail.result);
           sessionStorage.removeItem(SESSION_KEY);
+          sessionStorage.removeItem(SESSION_REF_KEY);
           destroyModal(modal);
           void saveVerificationAndRefreshUI(e.detail.verificationId, e.detail.result);
         });
@@ -953,13 +1017,15 @@ if (!userConfig.integrationKey) {
         modal.$on('manual_review', (e: CustomEvent<{ verificationId: string }>) => {
           log(`Modal fired "manual_review" event. verificationId="${e.detail.verificationId}"`);
           sessionStorage.removeItem(SESSION_KEY);
+          sessionStorage.removeItem(SESSION_REF_KEY);
           destroyModal(modal);
           void handleManualReviewResult(e.detail.verificationId);
         });
 
         modal.$on('close', () => {
-          log('Modal closed by user without completing verification.');
+          log('Modal closed by user without completing verification — doing a final status check.');
           destroyModal(modal);
+          void resolvePendingVerification();
         });
       } catch (err) {
         console.error('[AD-HOC VERIFY] Error starting verification:', (err as Error).message);
