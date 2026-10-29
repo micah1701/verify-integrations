@@ -14,7 +14,7 @@ import type { AdHocAdminConfig, AdHocExtensionConfig } from '../../core/types.js
 const adminConfig = (
   window as Window & { AdHocAdminConfig?: AdHocAdminConfig }
 ).AdHocAdminConfig ?? {
-  apiBase: 'https://edge.adhocverify.com',
+  apiBase: 'https://edge.adhocverify.com/functions/v1',
   storeHash: '',
   storeAccessToken: '',
 };

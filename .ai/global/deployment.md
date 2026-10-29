@@ -8,7 +8,7 @@
 | `BC_CLIENT_SECRET` | yes (BC) | App secret — OAuth exchange + HS256 verification of `signed_payload_jwt` for `/load` and `/uninstall`. **Server only.** |
 | `ADHOC_BC_CLIENT_ID` | build-time (BC) | Same value as `BC_CLIENT_ID`; baked into the storefront bundle by Vite (`__ADHOC_BC_CLIENT_ID__`). **Rebuild the storefront after changing it.** |
 | `APP_BASE_URL` | yes | Public URL of this server, no trailing slash. Used to build the OAuth `redirect_uri` (`${APP_BASE_URL}/bigcommerce/auth`). |
-| `ADHOC_API_BASE` | no | Ad-Hoc Verify API; default `https://verify-api.ad-hoc.app`. Injected into admin config. |
+| `ADHOC_API_BASE` | no | Ad-Hoc Verify API; default `https://edge.adhocverify.com/functions/v1`. Injected into admin config. |
 | `PORT` | no | Default 3000 in code. Production uses **3033** (Apache proxies to it). |
 | `DATABASE_PATH` | no | Token store JSON file; default `./data/tokens.json`. |
 

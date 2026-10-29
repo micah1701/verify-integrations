@@ -14,7 +14,7 @@ Express handlers, CommonJS, extensionless imports. Shared pieces: `../core/db` (
 2. `jwt.verify(token, BC_CLIENT_SECRET, {algorithms:['HS256']})`; claims `sub: "stores/HASH"`.
 3. `getToken(storeHash)`; none → 404 "Store Not Found" (reinstall).
 4. Read `dist/admin/index.html` (path resolved from CWD: `path.resolve('dist/admin/index.html')` — **the server must run with the repo root as CWD**); missing → 500 "Build Missing".
-5. Inject `<script>window.AdHocAdminConfig = {apiBase, storeHash, storeAccessToken}</script>` before `</head>`; `apiBase = ADHOC_API_BASE ?? https://verify-api.ad-hoc.app`.
+5. Inject `<script>window.AdHocAdminConfig = {apiBase, storeHash, storeAccessToken}</script>` before `</head>`; `apiBase = ADHOC_API_BASE ?? https://edge.adhocverify.com/functions/v1`.
 6. Headers: `Content-Type: text/html`, `Cache-Control: no-store`, remove `X-Frame-Options`, set `Content-Security-Policy: frame-ancestors 'self' https://*.bigcommerce.com https://*.mybigcommerce.com`.
 - `JSON.stringify` of the config is embedded directly in a `<script>`; values come from our own store (hash/token), not user input. If you add user-controlled fields, escape `</script>` / `<!--`.
 

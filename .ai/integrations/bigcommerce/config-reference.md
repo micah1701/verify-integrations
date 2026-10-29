@@ -13,7 +13,7 @@ Two shapes, one merge:
 | ------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------ | ------- | --------------------------------------------------------------------------------------- |
 | `integrationKey`                                                          | string                                                                       | — **required**                             | no      | `ahv_pub_…`; without it the plugin logs an error and stops                              |
 | `templateId`                                                              | UUID                                                                         | —                                          | no      | Enables remote config fetch; also sent as `template_id` on `create-verification`        |
-| `apiBase`                                                                 | URL                                                                          | `https://verify-api.ad-hoc.app`            | no      |                                                                                         |
+| `apiBase`                                                                 | URL                                                                          | `https://edge.adhocverify.com/functions/v1`            | no      |                                                                                         |
 | `verifyBase`                                                              | URL                                                                          | `https://adhocverify.com`                  | no      | Modal iframe origin: `${verifyBase}/verify/${id}`                                       |
 | `storeHash`                                                               | string                                                                       | —                                          | **yes** | Needed for any metafield read/write                                                     |
 | `storeAccessToken`                                                        | string                                                                       | —                                          | **yes** | Store-level API account token (Carts + Customers read/write)                            |
@@ -38,7 +38,7 @@ Two shapes, one merge:
 ## Defaults in code (`entry.ts`)
 
 ```ts
-apiBase 'https://verify-api.ad-hoc.app'; verifyBase 'https://adhocverify.com'; buttonText 'Verify ID'; selector '.cart-actions';
+apiBase 'https://edge.adhocverify.com/functions/v1'; verifyBase 'https://adhocverify.com'; buttonText 'Verify ID'; selector '.cart-actions';
 pages ['cart','checkout'];
 ruleset { requireVerification: true, minFaceMatchScore: null, requireOver18: false, requireOver21: false };
 manualReview { blockCheckout: false, message: 'Your verification is pending a manual review. You may continue to place your order, but there may be a delay in processing while we confirm your verification.' };

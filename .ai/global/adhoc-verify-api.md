@@ -1,6 +1,6 @@
 # Upstream API: Ad-Hoc Verify
 
-`INTEGRATION.md` at the repo root is the **source of truth** for the upstream API. This file is a map of what _this repo_ uses and the gotchas. Base URL default: `https://verify-api.ad-hoc.app` (override with `apiBase` in the storefront config / `ADHOC_API_BASE` on the server).
+`INTEGRATION.md` at the repo root is the **source of truth** for the upstream API. This file is a map of what _this repo_ uses and the gotchas. Base URL default: `https://edge.adhocverify.com/functions/v1` (override with `apiBase` in the storefront config / `ADHOC_API_BASE` on the server).
 
 The platform itself is developed in a different repo (`micah1701/verify`). If an endpoint here seems wrong, check that repo's `.ai/backend/rest-api.md` and `.ai/backend/edge-functions.md` rather than guessing.
 

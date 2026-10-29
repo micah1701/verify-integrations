@@ -80,7 +80,7 @@ export const handleLoad: RequestHandler = (req, res) => {
   }
 
   const config = {
-    apiBase: process.env.ADHOC_API_BASE ?? 'https://edge.adhocverify.com',
+    apiBase: process.env.ADHOC_API_BASE ?? 'https://edge.adhocverify.com/functions/v1',
     storeHash,
     storeAccessToken: tokenRecord.access_token,
   };

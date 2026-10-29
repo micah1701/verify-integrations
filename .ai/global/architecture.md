@@ -21,7 +21,7 @@
      │          ▼                                           ▼
      │   adhocverify.com/verify/<id>        ┌───────────────────────────────┐
      │                                        │ Our Express server            │
-     │ edge.adhocverify.com                   │  /bigcommerce/{auth,load,     │
+     │ edge.adhocverify.com/functions/v1                 │  /bigcommerce/{auth,load,     │
      ├── POST /create-verification (Int. Key) │   uninstall,api/*,admin/*}    │
      ├── GET  /get-verification-result        │  data/tokens.json (OAuth tok) │
      ├── GET  /get-template-config (Int. Key) └───────────────┬───────────────┘

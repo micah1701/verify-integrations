@@ -8,7 +8,7 @@ React 18 + BigDesign, built by `vite.admin.config.ts` (`base: '/bigcommerce/admi
 |---|---|
 | `index.html` (repo root) | Shell; mounts `#root`, loads `/src/bigcommerce/admin/index.tsx` |
 | `index.tsx` | `ReactDOM.createRoot(...).render(<App/>)` in `StrictMode` |
-| `App.tsx` | `ThemeProvider` + `GlobalStyles` + BigDesign `Tabs`: **Customers**, **Orders**, **Integration Config**. Reads `window.AdHocAdminConfig` (fallback for standalone dev: `{apiBase: 'https://verify-api.ad-hoc.app', storeHash:'', storeAccessToken:''}`) and passes it as `config` prop. |
+| `App.tsx` | `ThemeProvider` + `GlobalStyles` + BigDesign `Tabs`: **Customers**, **Orders**, **Integration Config**. Reads `window.AdHocAdminConfig` (fallback for standalone dev: `{apiBase: 'https://edge.adhocverify.com/functions/v1', storeHash:'', storeAccessToken:''}`) and passes it as `config` prop. |
 | `api/bc-proxy.ts` | `fetchCustomersList`, `fetchCustomerDetail`, `fetchOrdersList`, `fetchOrderDetail` → same-origin `/bigcommerce/api/...?storeHash=…`. Return `null` on any failure. |
 | `pages/CustomersPage.tsx` | Paginated list (25/50…) + search by customer ID → detail with verification metafield table, state badge, **Name Match** (recomputes `computeNameHash(customer first, last, verificationId)` and compares with `blockchain_name`, fetching it via `getVerificationResult` if absent from the metafield) |
 | `pages/OrdersPage.tsx` | Paginated list + find by order ID → order, linked customer, verification status; shows `metafieldSource` |

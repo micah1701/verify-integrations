@@ -92,7 +92,7 @@ Edit `.env` and fill in:
 | `BC_CLIENT_ID`     | BigCommerce Developer Portal → your app            |
 | `BC_CLIENT_SECRET` | BigCommerce Developer Portal → your app            |
 | `APP_BASE_URL`     | Your server's public URL (ngrok URL for local dev) |
-| `ADHOC_API_BASE`   | `https://verify-api.ad-hoc.app` (default)          |
+| `ADHOC_API_BASE`   | `https://edge.adhocverify.com/functions/v1` (default)          |
 
 ### Build & Run
 
