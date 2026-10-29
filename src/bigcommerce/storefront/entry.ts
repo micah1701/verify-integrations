@@ -47,7 +47,7 @@ declare const __ADHOC_BC_CLIENT_ID__: string;
 // ─── 1. Defaults & Config ────────────────────────────────────────────────────
 
 const defaults: Omit<AdHocVerifyConfig, 'integrationKey'> = {
-  apiBase: 'https://verify-api.ad-hoc.app',
+  apiBase: 'https://edge.adhocverify.com',
   verifyBase: 'https://adhocverify.com',
   buttonText: 'Verify ID',
   selector: '.cart-actions',
